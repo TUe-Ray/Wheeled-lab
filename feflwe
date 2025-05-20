@@ -1,0 +1,211 @@
+[33mcommit 497e972ef4e0647b0f443eda50ce6b60331dc4c8[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m
+Author: Ruei <s.huang5@student.tue.nl>
+Date:   Thu May 15 11:10:54 2025 +0200
+
+    new branch
+
+[33mcommit 0c3c6ab25d71524d498b1cdf6588d4fe7cb2d150[m
+Author: Ruei <s.huang5@student.tue.nl>
+Date:   Tue May 13 14:15:04 2025 +0200
+
+    initialization shit
+
+[33mcommit 501aa2c4ddfc29ff124f226f81e318a5ebb94794[m
+Merge: 137809a 24180fc
+Author: Rosario Scalise <rosario@cs.uw.edu>
+Date:   Wed Apr 9 20:18:19 2025 -0700
+
+    Merge pull request #22 from UWRobotLearning/correct-rsl-rl-version
+    
+    updating rsl-rl version to >=2.3.0
+
+[33mcommit 24180fcb28a13257ac3bd4b828dbf373722cade3[m
+Author: Tyler <geiko246@gmail.com>
+Date:   Sun Mar 30 13:57:39 2025 -0700
+
+    updating rsl-rl version to >=2.3.0
+
+[33mcommit 137809a93d21667e30f5a6e98b70ab685b33287f[m
+Author: Emily Kang <109045956+Emily-Kang77@users.noreply.github.com>
+Date:   Fri Mar 28 23:58:27 2025 -0700
+
+    Update README.md installation and VSCode instructions (#14)
+    
+    * Update README.md installation instructions and mention VSCode Python extension
+    
+    * replace env_isaaclab with WL for environment name
+    
+    * add CONTRIBUTING.md
+    
+    * removed feature request line, updated isaaclab section in README
+
+[33mcommit 51c0fc2ff2d7fb27dc9f9de9212f43f6c77b2b29[m
+Merge: 358bca0 cf11974
+Author: Sanghun <shjung13@cs.washington.edu>
+Date:   Tue Mar 11 10:33:31 2025 -0700
+
+    Merge pull request #13 from AlistairKeiller/main
+    
+    update for gymnasium v1.0 / optimize video recording / bump-up Isaac-Lab version to 2.0.2
+
+[33mcommit cf119740aaffe66d5153422ddd1b7f65867d3d5e[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Mon Mar 10 15:45:29 2025 -0700
+
+    round self.frames_per_sec
+
+[33mcommit 64d57f8564800a7bd77b33bd52b8244afe957697[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Mon Mar 10 15:41:02 2025 -0700
+
+    use fps parameter of RecordVideo
+
+[33mcommit 5e28c612efd0e159bc699a7077fbb38080f6c5a3[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 21:50:30 2025 -0800
+
+    update rate to 60
+
+[33mcommit a42ca4a9a25d2b478cbe6a794504ff3405ea282c[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 20:38:53 2025 -0800
+
+    switch to pyav
+
+[33mcommit 7d087600faaf23e0cd0868dedf789cf2e0aae560[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 16:33:28 2025 -0800
+
+    switch back to mp4
+
+[33mcommit 6b9f6f09de8eb188bc62d21c1d985aac7fbba410[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 16:28:37 2025 -0800
+
+    do resizing in ffmpeg
+
+[33mcommit 949c7607c5c4f545115ba3c02c3e1ea5c8348be9[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 16:24:03 2025 -0800
+
+    add resizing and crf
+
+[33mcommit b90cdc71eadfa62843b11a4509d5a230e13f4e13[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 16:03:46 2025 -0800
+
+    use webm
+
+[33mcommit b22d34ed2bfa522a017ff9056941ce49df41caf0[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 15:56:27 2025 -0800
+
+    update to use h265
+
+[33mcommit 06030dc87d6275b14df77a358da8f602e76e5fd7[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Fri Mar 7 00:43:50 2025 -0800
+
+    update IsaacLab banner to v2.0.2
+
+[33mcommit 72b8272ceb9b96076ff7c801a75f504b310dad7b[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Thu Mar 6 23:42:59 2025 -0800
+
+    use veryslow preset
+
+[33mcommit 179ded54c679078949534e955ca0758c1436e89d[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Thu Mar 6 23:38:14 2025 -0800
+
+    update README for gymnasium v1.0
+
+[33mcommit 9bc8fc08be21ad12fc1214a1e86aac3677d371a2[m
+Author: Alistair Keiller <alistair@keiller.net>
+Date:   Thu Mar 6 22:49:05 2025 -0800
+
+    update for gymnasium v1.0
+
+[33mcommit 358bca0fbbbc5e2db69144a5e7c4c284b0776dd9[m
+Author: Alistair Keiller <43255248+AlistairKeiller@users.noreply.github.com>
+Date:   Thu Mar 6 21:04:25 2025 -0800
+
+    unpack the correct number of values from PPO.update() (#12)
+    
+    * unpack the correct number of values from PPO.update()
+    
+    * provide installation instructions for Isaac Sim v4.5.0 and Isaac Lab v2.0.2
+
+[33mcommit ec4b1c77067c86268e64239be54c5b54cf16c7c8[m
+Author: Tyler <geiko246@gmail.com>
+Date:   Mon Mar 3 17:41:31 2025 -0800
+
+    adding 4WD suspension config (now MUSHR_SUS_CFG) and explicit 2WD config (MUSHR_SUS_2WD_CFG)
+
+[33mcommit 4e9ab8a036cad40f50487808f8e09c8ca932f423[m
+Author: Tyler <30834989+geiko246@users.noreply.github.com>
+Date:   Wed Mar 5 14:41:58 2025 -0800
+
+    adding play script and adding config dump to train_rl (#9)
+    
+    * adding play script and adding config dump to train_rl
+    
+    * adding example usage at top of file
+    
+    * consolidating FROM_RUN code branch
+
+[33mcommit 274a25ba881d7778001d6d1a5a6b27e9d4cbeb66[m
+Author: Tyler <30834989+geiko246@users.noreply.github.com>
+Date:   Thu Feb 20 16:13:14 2025 -0800
+
+    adding reallab to root readme. adding config info to rl readme (#5)
+
+[33mcommit 0a5901cbcf6ea32dfb4011afe48a3cb88a4527ce[m
+Author: Sanghun <shjung13@cs.washington.edu>
+Date:   Thu Feb 20 00:28:53 2025 -0800
+
+    Make video recording parameters configurable (#4)
+    
+    * make video recording params configurable
+    
+    * tune video recording configuration - CRF 30 with 1280 x 720 - approx 0.8MB for drifting policy
+
+[33mcommit 98086f3ebded818562f739c77fd8ce26eda697aa[m
+Author: Tyler <30834989+geiko246@users.noreply.github.com>
+Date:   Sat Feb 15 23:15:56 2025 -0800
+
+    Fix memory leak (#2)
+    
+    * fix memory leak in video recorder
+    
+    * remove debugging code
+    
+    * fix hydra override for train configs
+    
+    * fix no wandb video recoder by integrating them to wandb recorder
+    
+    * replace video compile backbone to PyAV
+    
+    * replace video compile backbone to PyAV
+    
+    * update less lossy video compression
+    
+    * adding pyav dependency and updating readme to include website, paper, and deployment
+    
+    * adding av as dependency and updating docs
+    
+    ---------
+    
+    Co-authored-by: shjung13 <shjung13@cs.washington.edu>
+
+[33mcommit 6e67ed69cd5a264dcde2e96452adf6086a0da031[m
+Author: Tyler <geiko246@gmail.com>
+Date:   Mon Feb 10 21:56:17 2025 -0800
+
+    Changes to complete migration to isaaclab 2.0. adds hotswapping between rss run configs through command line.
+
+[33mcommit f3fe30c3ca5ca3ed191f8a64d9a5c47e19465e52[m
+Author: Tyler <30834989+geiko246@users.noreply.github.com>
+Date:   Mon Jan 20 14:15:49 2025 -0800
+
+    Initial commit
