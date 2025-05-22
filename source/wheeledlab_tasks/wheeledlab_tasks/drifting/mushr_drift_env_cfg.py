@@ -25,19 +25,17 @@ from .mdp import reset_root_state_along_track
 ###### COMMON CONSTANTS ######
 ##############################
 
-CORNER_IN_RADIUS = 0.3        # For termination
-CORNER_OUT_RADIUS = 2.0       # For termination
-LINE_RADIUS = 0.8             # For spawning and reward
-STRAIGHT = 0.8                # Shaping
-SLIP_THRESHOLD = 0.55         # (rad) For reward
-MAX_SPEED = 3.0               # (m/s) For action and reward
+GOAL        = (10.0, 0.0)
+GOAL_RADIUS = 0.5
+STOP_RADIUS = 5.0
+MAX_SPEED   = 3.0
 
 ###################
 ###### SCENE ######
 ###################
 
 @configclass
-class DriftTerrainImporterCfg(TerrainImporterCfg):
+class GroundCfg(TerrainImporterCfg):
 
     height = 0.0
     prim_path = "/World/ground"
@@ -55,7 +53,7 @@ class DriftTerrainImporterCfg(TerrainImporterCfg):
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-    terrain = DriftTerrainImporterCfg()
+    terrain = GroundCfg()
 
     robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
