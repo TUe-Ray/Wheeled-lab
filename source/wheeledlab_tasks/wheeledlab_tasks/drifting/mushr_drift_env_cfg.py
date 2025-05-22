@@ -17,7 +17,8 @@ from isaaclab.managers import (
 )
 from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
-from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, NotBlindObsCfg
+from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg
+from wheeledlab_assets import OriginRobotCfg
 
 from .mdp import reset_root_state_along_track
 
@@ -27,7 +28,7 @@ from .mdp import reset_root_state_along_track
 
 CORNER_IN_RADIUS = 0.3        # For termination
 CORNER_OUT_RADIUS = 2.0       # For termination
-LINE_RADIUS = 0.8             # Fo-r spawning and reward
+LINE_RADIUS = 0.8             # For spawning and reward
 STRAIGHT = 0.8                # Shaping
 SLIP_THRESHOLD = 0.55         # (rad) For reward
 MAX_SPEED = 3.0               # (m/s) For action and reward
@@ -56,8 +57,8 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
     terrain = DriftTerrainImporterCfg()
+    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     light = AssetBaseCfg(
@@ -77,7 +78,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     ray_caster = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/mushr_nano/base_link",
         update_period=1,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.0)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
         mesh_prim_paths=["/World/envs/env_0/Obstacle1"],
         #mesh_prim_paths=["/World/ground"],
@@ -85,8 +86,8 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-0.0,-0.0) ,
-            horizontal_fov_range=(-90.0, 90.0),
+            vertical_fov_range=(-15.0,-15.0) ,
+            horizontal_fov_range=(-180.0, 180.0),
             horizontal_res=1.0
         ),
         
@@ -405,7 +406,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     env_spacing: float = 0.
 
     # Basic Settings
-    observations: BlindObsCfg = NotBlindObsCfg()
+    observations: BlindObsCfg = BlindObsCfg()
     # actions: MushrRWDActionCfg = MushrRWDActionCfg()
     actions: SkidSteerActionCfg = SkidSteerActionCfg()
 
