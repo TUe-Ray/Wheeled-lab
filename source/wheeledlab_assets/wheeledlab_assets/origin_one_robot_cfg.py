@@ -28,7 +28,7 @@ OriginRobotCfg = ArticulationCfg(
     ),
     actuators={
         "wheel_act": IdealPDActuatorCfg(
-            joint_names_expr=[".wheel."],
+            joint_names_expr=[".*_wheel_joint"],
             stiffness=3.0,
             damping=60.0,
             effort_limit=20.0,

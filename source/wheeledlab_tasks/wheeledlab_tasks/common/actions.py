@@ -71,3 +71,17 @@ class SkidSteerActionCfg:
         no_reverse=False,
         asset_name="robot",
     )
+
+@configclass
+class OriginActionCfg:
+    throttle = DifferentialDriveActionCfg(
+        left_wheel_joint_names = ["left_front_wheel_joint", "left_rear_wheel_joint"],
+        right_wheel_joint_names = ["right_front_wheel_joint", "right_rear_wheel_joint"],
+        wheel_radius=0.12,
+        wheel_base=0.5,        # Distance between left and right wheels
+        # command_type="velocity",  # or "effort", depending on how your URDF/SDF is set up
+        scale=(1.0, 1.0),         # Max linear and angular velocity (optional)
+        bounding_strategy="clip",
+        no_reverse=False,
+        asset_name="robot",
+    )

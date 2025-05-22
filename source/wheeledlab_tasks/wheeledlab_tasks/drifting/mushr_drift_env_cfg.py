@@ -17,7 +17,7 @@ from isaaclab.managers import (
 )
 from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
-from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg
+from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
 
 from .mdp import reset_root_state_along_track
@@ -69,7 +69,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Obstacle1",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
-            size=(1.0,1.0,1.0),
+            size=(1.0,1.0,3.0),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
@@ -78,7 +78,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     ray_caster = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
         mesh_prim_paths=["/World/envs/env_0/Obstacle1"],
         #mesh_prim_paths=["/World/ground"],
@@ -122,7 +122,6 @@ class DriftEventsCfg:
         },
         mode="reset",
     )
-
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
 
@@ -134,7 +133,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
             "dynamic_friction_range": (0.3, 0.5),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel_link"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"),
             "make_consistent": True,
         },
     )
@@ -143,7 +142,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_actuator_gains,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*back.*throttle"]),
+            "asset_cfg": SceneEntityCfg("robot",  joint_names=[".*_wheel_joint"]),
             "damping_distribution_params": (10.0, 50.0),
             "operation": "abs",
         },
@@ -177,13 +176,12 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["base_link"]),
+            "asset_cfg": SceneEntityCfg("robot", body_names=["main_body"]),
             "mass_distribution_params": (0.3, 0.5),
             "operation": "add",
             "distribution": "uniform",
         },
     )
-
 ######################
 ###### REWARDS #######
 ######################
@@ -298,11 +296,11 @@ class DriftRewardsCfg:
         weight=40.
     )
 
-    tlgr = RewTerm(
-        func=turn_left_go_right,
-        params={"ang_vel_thresh": 1.},
-        weight=0.,
-    )
+#    tlgr = RewTerm(
+#        func=turn_left_go_right,
+#        params={"ang_vel_thresh": 1.},
+#        weight=0.,
+#    )
 
     turn_energy = RewTerm(
         func=energy_through_turn,
@@ -347,15 +345,15 @@ class DriftCurriculumCfg:
         }
     )
 
-    more_tlgr = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "tlgr",
-            "increase": 10.,
-            "episodes_per_increase": 20,
-            "max_increases": 5,
-        }
-    )
+#    more_tlgr = CurrTerm(
+#        func=increase_reward_weight_over_time,
+#        params={
+#            "reward_term_name": "tlgr",
+#            "increase": 10.,
+#            "episodes_per_increase": 20,
+#            "max_increases": 5,
+#        }
+#    )
 
     more_term_pens = CurrTerm(
         func=increase_reward_weight_over_time,
@@ -373,8 +371,8 @@ class DriftCurriculumCfg:
 
 def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radius:float):
     out = torch.logical_or(
-        off_track(env, straight, corner_out_radius) > 0.5,
-        in_range(env, straight, corner_in_radius) > 0.5
+        off_track(env, straight, corner_out_radius) > 5,
+        in_range(env, straight, corner_in_radius) > 5
     )
     return out
 
@@ -407,8 +405,8 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     # Basic Settings
     observations: BlindObsCfg = BlindObsCfg()
     # actions: MushrRWDActionCfg = MushrRWDActionCfg()
-    actions: SkidSteerActionCfg = SkidSteerActionCfg()
-
+    #actions: SkidSteerActionCfg = SkidSteerActionCfg()
+    actions: OriginActionCfg = OriginActionCfg()
 
     # MDP Settings
     rewards: DriftRewardsCfg = DriftRewardsCfg()
@@ -421,7 +419,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         super().__post_init__()
 
         # viewer settings
-        self.viewer.eye = [4., -4., 4.]
+        self.viewer.eye = [10., -10., 10.]
         self.viewer.lookat = [0.0, 0.0, 0.]
 
         self.sim.dt = 0.005  # 200 Hz
