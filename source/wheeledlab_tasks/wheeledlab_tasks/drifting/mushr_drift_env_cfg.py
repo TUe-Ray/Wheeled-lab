@@ -74,11 +74,11 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
     )
-     # LiDAR sensor
+# LiDAR sensor
     ray_caster = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/mushr_nano/base_link",
+        prim_path="{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0)),
         attach_yaw_only=False,
         mesh_prim_paths=["/World/envs/env_0/Obstacle1"],
         #mesh_prim_paths=["/World/ground"],
@@ -93,7 +93,6 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         
         debug_vis=True,
     )
-
 
 
     def __post_init__(self):

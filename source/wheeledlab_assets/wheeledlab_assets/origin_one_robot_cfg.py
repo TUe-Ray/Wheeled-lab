@@ -1,7 +1,9 @@
 import os
+
 from isaaclab.assets import ArticulationCfg
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg
+
 
 # Optional: adjust if you have a constants file for radius
 WHEEL_RADIUS = 0.1175
@@ -11,8 +13,8 @@ OriginRobotCfg = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
     spawn=sim_utils.UrdfFileCfg(
         asset_path=os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "data", "Robots", "origin_v18.urdf")
-        ),
+    os.path.join(os.path.dirname(__file__), "..", "data", "Robots", "origin_v18.urdf")
+),
         joint_drive=None,
         fix_base=False,
         merge_fixed_joints=True,
