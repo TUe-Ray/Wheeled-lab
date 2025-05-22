@@ -7,11 +7,11 @@ from wheeledlab_rl.configs import (
 @configclass
 class RSS_DRIFT_CONFIG(RslRlRunConfig):
     env_setup = EnvSetup(
-        num_envs=2,
+        num_envs=10,
         task_name="Isaac-MushrDriftRL-v0"
     )
     train = RLTrainConfig(
-        num_iterations=50,
+        num_iterations=500,
         rl_algo_lib="rsl",
         rl_algo_class="ppo",
         log=LogConfig(
