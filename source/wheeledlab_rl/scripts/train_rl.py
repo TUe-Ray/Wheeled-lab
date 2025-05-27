@@ -21,8 +21,8 @@ import os
 import torch
 
 # Set the W&B API Key
-os.environ["WANDB_API_KEY"] = "41bb1124b81ea3364629063efbf3964a07de7a6f"
-os.environ["WANDB_USERNAME"] = "s-huang5" 
+os.environ["WANDB_API_KEY"] = "cce39c00168b08312b009079d9efa5b8e64f7806"
+os.environ["WANDB_USERNAME"] = "jleliveld" 
 
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml, dump_pickle
