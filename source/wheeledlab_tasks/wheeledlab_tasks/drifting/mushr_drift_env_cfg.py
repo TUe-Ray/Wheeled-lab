@@ -19,7 +19,7 @@ from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
-
+from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from .mdp import reset_root_state_along_track
 
 ##############################
@@ -57,8 +57,8 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
     terrain = DriftTerrainImporterCfg()
-    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
+    #robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     light = AssetBaseCfg(
@@ -76,7 +76,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
 # LiDAR sensor
     ray_caster = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/main_body",
+        prim_path="{ENV_REGEX_NS}/Robot/mushr_nano/base_link",    #"{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
@@ -133,7 +133,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
             "dynamic_friction_range": (0.3, 0.5),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel_link"),#body_names=".*wheel"),
             "make_consistent": True,
         },
     )
@@ -142,7 +142,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_actuator_gains,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot",  joint_names=[".*_wheel_joint"]),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*back.*throttle"]),  #joint_names=[".*_wheel_joint"]),
             "damping_distribution_params": (10.0, 50.0),
             "operation": "abs",
         },
@@ -176,7 +176,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["main_body"]),
+            "asset_cfg": SceneEntityCfg("robot", body_names=["base_link"]),#body_names=["main_body"]),
             "mass_distribution_params": (0.3, 0.5),
             "operation": "add",
             "distribution": "uniform",
@@ -463,8 +463,8 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     # Basic Settings
     observations: BlindObsCfg = BlindObsCfg()
     # actions: MushrRWDActionCfg = MushrRWDActionCfg()
-    #actions: SkidSteerActionCfg = SkidSteerActionCfg()
-    actions: OriginActionCfg = OriginActionCfg()
+    actions: SkidSteerActionCfg = SkidSteerActionCfg()
+    #actions: OriginActionCfg = OriginActionCfg()
 
     # MDP Settings
     rewards: TraverseABCfg = TraverseABCfg()
