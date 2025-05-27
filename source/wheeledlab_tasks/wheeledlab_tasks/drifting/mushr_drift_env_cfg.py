@@ -436,9 +436,9 @@ def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radiu
     )
     return out
 
-def reached_goal(env, goal=torch.tensor([5.0, 5.0]), thresh: float = 0.3):
+def reached_goal(env, goal=[5.0, 5.0], thresh: float = 0.3):
     pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
-    goal  = goal.to(env.device).unsqueeze(0)           # 1 x 2
+    goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
     dist  = torch.norm(pos - goal, dim=-1)             # B
     return dist < thresh
 
@@ -449,7 +449,7 @@ class GoalNavTerminationsCfg:
     goal_reached = DoneTerm(
         func=reached_goal,
         params={
-            "goal": torch.tensor([5.0, 5.0]),  # Point B
+            "goal": [5.0, 5.0],  # Point B
             "thresh": 0.3
         }
     )
