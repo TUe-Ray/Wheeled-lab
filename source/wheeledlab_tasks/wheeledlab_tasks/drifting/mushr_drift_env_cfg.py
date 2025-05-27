@@ -105,7 +105,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
-def reset_fixed_start(env: ManagerBasedEnv, env_ids, asset_cfg: SceneEntityCfg):
+def reset_fixed_start(env: ManagerBasedRLEnvCfg, env_ids, asset_cfg: SceneEntityCfg):
     from isaaclab.assets import RigidObject, Articulation
     asset: RigidObject | Articulation = env.scene[asset_cfg.name]
 
