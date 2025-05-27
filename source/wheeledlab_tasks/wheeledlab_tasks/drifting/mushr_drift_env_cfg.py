@@ -20,7 +20,7 @@ from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
-from .mdp import reset_root_state_along_track
+from .mdp import reset_root_state_along_track, reset_root_state_new
 
 ##############################
 ###### COMMON CONSTANTS ######
@@ -105,31 +105,33 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
-def reset_fixed_start(env: ManagerBasedRLEnvCfg, env_ids, asset_cfg: SceneEntityCfg):
-    from isaaclab.assets import RigidObject, Articulation
-    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
-
-    # Define fixed start pose
-    pos = torch.tensor([0.0, 0.0, 0.0], device=env.device).expand(len(env_ids), -1)
-    rot = torch.tensor([1.0, 0.0, 0.0, 0.0], device=env.device).expand(len(env_ids), -1)
-    pose = torch.cat([pos, rot], dim=-1)
-
-    asset.write_root_pose_to_sim(pose, env_ids=env_ids)
-    asset.write_root_velocity_to_sim(torch.zeros((len(env_ids), 6), device=env.device), env_ids=env_ids)
-
-
 
 @configclass
 class DriftEventsCfg:
     # on startup
 
+#    reset_root_state = EventTerm(
+#        func=reset_root_state_along_track,
+#        params={
+#            "track_radius": LINE_RADIUS,
+#            "track_straight_dist": STRAIGHT,
+#            "num_points": 20,
+#            "pos_noise": 0.5,
+#            "yaw_noise": 1.0,
+#            "asset_cfg": SceneEntityCfg("robot"),
+#        },
+#        mode="reset",
+#    )
     reset_root_state = EventTerm(
-        func=reset_fixed_start,
-        mode="reset",
+        func=reset_root_state_new,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
+            "pos": [10, 10, 0.0],    # ← your desired start-point A
+            "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
+        mode="reset",
     )
+
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
 

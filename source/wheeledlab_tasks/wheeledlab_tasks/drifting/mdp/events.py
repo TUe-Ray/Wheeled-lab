@@ -5,6 +5,8 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import EventTermCfg, ManagerTermBase, SceneEntityCfg
 
 from isaaclab.envs import ManagerBasedEnv
+import isaaclab.sim.utils as sim_utils
+
 
 
 class reset_root_state_along_track(ManagerTermBase):
@@ -12,7 +14,7 @@ class reset_root_state_along_track(ManagerTermBase):
     during environment resets with additive noise.
     """
 
-    def __init__(self, cfg: EventTermCfg, env: ManagerBasedEnv):
+    def _init_(self, cfg: EventTermCfg, env: ManagerBasedEnv):
         """Initialize the term.
 
         Args:
@@ -22,7 +24,7 @@ class reset_root_state_along_track(ManagerTermBase):
         Raises:
             ValueError: If the asset is not a RigidObject or an Articulation.
         """
-        super().__init__(cfg, env)
+        super()._init_(cfg, env)
         self.track_radius = torch.tensor(cfg.params.get("track_radius", 0.8), device=self.device)
         self.track_straight_dist = torch.tensor(cfg.params.get("track_straight_dist", 0.8), device=self.device)
         self.num_points = cfg.params.get("num_points", 20)
@@ -99,7 +101,7 @@ class reset_root_state_along_track(ManagerTermBase):
         reference_poses = torch.stack([pos, ori], dim=1)
         return reference_poses
 
-    def __call__(
+    def _call_(
         self,
         env: ManagerBasedEnv,
         env_ids: torch.Tensor | None,
@@ -131,3 +133,40 @@ class reset_root_state_along_track(ManagerTermBase):
 
         asset.write_root_pose_to_sim(torch.cat([posns, oris], dim=-1), env_ids=env_ids)
         asset.write_root_velocity_to_sim(torch.zeros((len(env_ids), 6), device=env.device), env_ids=env_ids)
+
+class reset_root_state_new(ManagerTermBase):
+    """
+    Reset the robot at a fixed start pose each episode.
+    Params:
+      - asset_cfg: the robot’s SceneEntityCfg
+      - pos: [x, y, z] start coordinates (your point A)
+      - rot: [qx, qy, qz, qw] start orientation
+    """
+    def _init_(self, cfg: EventTermCfg, env: ManagerBasedEnv):
+        super()._init_(cfg, env)
+
+    def _call_(
+        self,
+        env: ManagerBasedEnv,
+        env_ids: torch.Tensor,
+        asset_cfg: SceneEntityCfg,
+        pos: list[float],
+        rot: list[float],
+    ):
+        # Fetch the instantiated asset from the scene by name
+        asset: Articulation | RigidObject = env.scene[asset_cfg.name]
+
+        # Create a [batch_size x 3] tensor for position
+        pos_t = torch.tensor(pos, device=env.device).view(1, 3).repeat(len(env_ids), 1)
+        # Create a [batch_size x 4] tensor for rotation
+        rot_t = torch.tensor(rot, device=env.device).view(1, 4).repeat(len(env_ids), 1)
+        # Concatenate to [batch_size x 7]
+        root_state = torch.cat([pos_t, rot_t], dim=-1)
+
+        # Apply the pose to the simulator
+        asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
+        # Zero out any residual velocity
+        asset.write_root_velocity_to_sim(
+            torch.zeros((len(env_ids), 6), device=env.device),
+            env_ids=env_ids,
+        )
