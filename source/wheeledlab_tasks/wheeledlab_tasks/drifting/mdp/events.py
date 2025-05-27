@@ -143,7 +143,7 @@ class reset_root_state_new(ManagerTermBase):
       - rot: [qx, qy, qz, qw] start orientation
     """
     def __init__(self, cfg: EventTermCfg, env: ManagerBasedEnv):
-        super()._init_(cfg, env)
+        super().__init__(cfg, env)
 
     def __call__(
         self,
