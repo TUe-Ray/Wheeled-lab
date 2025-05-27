@@ -302,10 +302,14 @@ def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
     return dot  # +1 when aligned, -1 when opposite
 
 def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
+    # current step number (scalar)
+    step = max(int(env.common_step_counter), 1)
     pos = mdp.root_pos_w(env)[..., :2]
     dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
     reached = dist_to_goal < reached_thresh
-    return reached.float() / env.episode_step_counter.clamp(min=1)
+    # constant scalar divisor broadcasts to (B,)
+    return reached.float() / float(step)
+
 
 def min_lidar_distance_penalty(env, threshold=0.5):
     lidar: RayCaster = env.scene.sensors["ray_caster"]
