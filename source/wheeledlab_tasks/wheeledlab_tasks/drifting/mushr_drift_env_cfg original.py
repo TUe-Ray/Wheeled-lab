@@ -29,7 +29,7 @@ CORNER_OUT_RADIUS = 2.0       # For termination
 LINE_RADIUS = 0.8             # For spawning and reward
 STRAIGHT = 0.8                # Shaping
 SLIP_THRESHOLD = 0.55         # (rad) For reward
-MAX_SPEED = 3.0               # (m/s) For action and reward
+MAX_SPEED = 1.0               # (m/s) For action and reward
 
 ###################
 ###### SCENE ######
@@ -94,8 +94,8 @@ class DriftEventsCfg:
             "track_radius": LINE_RADIUS,
             "track_straight_dist": STRAIGHT,
             "num_points": 20,
-            "pos_noise": 0.5,
-            "yaw_noise": 1.0,
+            "pos_noise": 0.0,
+            "yaw_noise": 0.0,
             "asset_cfg": SceneEntityCfg("robot"),
         },
         mode="reset",

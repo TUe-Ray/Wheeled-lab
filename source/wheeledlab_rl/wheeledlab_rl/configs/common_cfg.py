@@ -17,7 +17,7 @@ class LogConfig:
     no_log: bool = False                                # Disable logging
     log_every: int = 10                                 # Log every n updates
     video: bool = True                                  # Record videos during training
-    video_length: int = 500                             # Length of the recorded video (in steps)
+    video_length: int = 1000                             # Length of the recorded video (in steps)
     video_interval: int = 5000                          # Interval between video recordings (in steps)
     no_checkpoints: bool = False                        # Disable saving checkpoints
     checkpoint_every: int = 1000                        # Save checkpoint every n updates

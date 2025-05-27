@@ -24,8 +24,8 @@ import os
 import torch
 
 # Set the W&B API Key
-os.environ["WANDB_API_KEY"] = "cce39c00168b08312b009079d9efa5b8e64f7806"
-os.environ["WANDB_USERNAME"] = "jleliveld" 
+os.environ["WANDB_API_KEY"] = "4593d25c7165eb7adb5091abca9228fe0bd2182d"
+os.environ["WANDB_USERNAME"] = "k-h-f-gulikers" 
 
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml, dump_pickle
@@ -73,7 +73,7 @@ def main(run_cfg: RunConfig): # TODO: Add SB3 config support
 
     if not log_cfg.no_wandb:
         import wandb
-        wandb.login(key="41bb1124b81ea3364629063efbf3964a07de7a6f")
+        wandb.login(key="4593d25c7165eb7adb5091abca9228fe0bd2182d")
         run = wandb.init(
             project=log_cfg.wandb_project,
         )
@@ -98,9 +98,9 @@ def main(run_cfg: RunConfig): # TODO: Add SB3 config support
     env = gym.make(env_setup.task_name, cfg=env_cfg, render_mode="rgb_array" if log_cfg.video else None)
 
     ####### INSTANTIATE ENV #######
-    env.action_space.low = -1.
-    env.action_space.high = 1.
-    env = ClipAction(env)
+    #env.action_space.low = -1.
+    #env.action_space.high = 1.
+    #env = ClipAction(env)
 
     # Wrap the environment in recorder
     if log_cfg.video:

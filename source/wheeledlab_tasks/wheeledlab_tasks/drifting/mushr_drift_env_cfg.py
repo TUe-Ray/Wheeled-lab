@@ -20,7 +20,9 @@ from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
 
-from .mdp import reset_root_state_along_track
+
+from .mdp import reset_root_state_along_track, reset_root_state_new
+
 
 ##############################
 ###### COMMON CONSTANTS ######
@@ -31,7 +33,7 @@ CORNER_OUT_RADIUS = 2.0       # For termination
 LINE_RADIUS = 0.8             # For spawning and reward
 STRAIGHT = 0.8                # Shaping
 SLIP_THRESHOLD = 0.55         # (rad) For reward
-MAX_SPEED = 3.0               # (m/s) For action and reward
+MAX_SPEED = 1.0               # (m/s) For action and reward
 
 ###################
 ###### SCENE ######
@@ -57,8 +59,14 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
     terrain = DriftTerrainImporterCfg()
-    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
+    robot: ArticulationCfg = OriginRobotCfg.replace(
+        prim_path="{ENV_REGEX_NS}/Robot",
+        init_state=ArticulationCfg.InitialStateCfg(
+            pos=[0.0, 0.0, 0.0],      # leave X,Y,Z at your desired spawn point
+            # Quaternion [w, x, y, z] = [0,0,0,1] is a 180° rotation about Z
+            rot=[0.0, 0.0, 0.0, 1.0],
+        ),
+    )
 
     # lights
     light = AssetBaseCfg(
@@ -67,7 +75,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
     obstacle1 = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
             size=(1.0,1.0,3.0),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
@@ -86,7 +94,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-15.0,-15.0) ,
+            vertical_fov_range=(0,0) ,
             horizontal_fov_range=(-180.0, 180.0),
             horizontal_res=1.0
         ),
@@ -110,18 +118,30 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 class DriftEventsCfg:
     # on startup
 
+#    reset_root_state = EventTerm(
+#        func=reset_root_state_along_track,
+#        params={
+#            "track_radius": LINE_RADIUS,
+#            "track_straight_dist": STRAIGHT,
+#            "num_points": 20,
+#            "pos_noise": 0.5,
+#            "yaw_noise": 1.0,
+#            "asset_cfg": SceneEntityCfg("robot"),
+#        },
+#        mode="reset",
+#    )
     reset_root_state = EventTerm(
-        func=reset_root_state_along_track,
+        func=reset_root_state_new,
         params={
-            "track_radius": LINE_RADIUS,
-            "track_straight_dist": STRAIGHT,
-            "num_points": 20,
-            "pos_noise": 0.5,
-            "yaw_noise": 1.0,
             "asset_cfg": SceneEntityCfg("robot"),
+            "pos": [-4, 0, 0.0],
+            "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",
     )
+
+
+
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
 
@@ -269,8 +289,12 @@ def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
     return rew
 
 def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=1.0):
-    pos = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+#    pos = mdp.root_pos_w(env)[..., :2]
+#    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    # ensure goal is a tensor on the correct device
+    goal = torch.as_tensor(goal, device=env.device)
+    pos  = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal - pos, dim=-1)
     return torch.exp(-dist / scale)
 
 def lidar_obstacle_penalty(env, min_dist=0.3):
@@ -293,9 +317,11 @@ def forward_vel(env):
     return mdp.base_lin_vel(env)[:, 0]
 
 def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
+    goal = torch.as_tensor(goal, device=env.device)
     pos = mdp.root_pos_w(env)[..., :2]  # B x 2
     vel = mdp.base_lin_vel(env)[..., :2]  # B x 2
-    to_goal = goal.to(env.device) - pos  # B x 2
+    to_goal = goal - pos  
+    #to_goal = goal.to(env.device) - pos  # B x 2
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
     vel_norm = torch.nn.functional.normalize(vel, dim=-1)
     dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
@@ -303,9 +329,11 @@ def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
 
 def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
     # current step number (scalar)
+    goal = torch.as_tensor(goal, device=env.device)
     step = max(int(env.common_step_counter), 1)
     pos = mdp.root_pos_w(env)[..., :2]
-    dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
+    #dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
+    dist_to_goal = torch.norm(goal - pos, dim=-1)
     reached = dist_to_goal < reached_thresh
     # constant scalar divisor broadcasts to (B,)
     return reached.float() / float(step)
@@ -335,10 +363,13 @@ def low_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
     return -torch.abs(ang_vel[..., 2])  # Penalize yaw
 
-def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
-    pos = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    return torch.where(dist < threshold, 10.0, 0.0)
+def goal_reached_reward(env, goal=[5.0,5.0], threshold=0.3):
+    # turn the goal list into a tensor on the right device
+    goal = torch.as_tensor(goal, device=env.device)
+    pos  = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal - pos, dim=-1)
+    return (dist < threshold).float()
+
 
 
 @configclass
@@ -346,12 +377,16 @@ class TraverseABCfg:
     goal_progress = RewTerm(
         func=move_towards_goal,
         weight=10.0,
+        params={
+            "goal": [4.0, 0.0],
+            "scale": 1.0,
+        },
     )
 
     obstacle_avoidance = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=5.0,
-        params={"min_dist": 0.3},
+        weight=10.0,
+        params={"min_dist": 0.5},
     )
 
     alive = RewTerm(
@@ -373,10 +408,31 @@ class TraverseABCfg:
         func = forward_vel,
         weight = 2,
     )
-    align = RewTerm(func=goal_direction_alignment, weight=5.0)
+#    align = RewTerm(func=goal_direction_alignment, weight=5.0)
+    align = RewTerm(
+        func=goal_direction_alignment,
+        weight=5.0,
+        params={"goal": [4.0, 0.0]},
+    )
     avoid = RewTerm(func=min_lidar_distance_penalty, weight=3.0)
-    reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    time = RewTerm(func=time_efficiency, weight=10.0)
+#    reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    reach = RewTerm(
+        func=goal_reached_reward,
+        weight=50.0,
+        params={
+            "goal": [4.0, 0.0],
+            "threshold": 0.3,
+        },
+    )
+#    time = RewTerm(func=time_efficiency, weight=10.0)
+    time = RewTerm(
+        func=time_efficiency,
+        weight=10.0,
+        params={
+            "goal": [4.0, 0.0],
+            "reached_thresh": 0.3,
+        },
+    )
     stable = RewTerm(func=low_angular_velocity, weight=1.0)
 
 
@@ -475,6 +531,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         super().__post_init__()
+        print(" → action-cfg channels:", list(vars(self.actions).keys()))
 
         # viewer settings
         self.viewer.eye = [10., -10., 10.]
@@ -483,8 +540,8 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 5
-        self.actions.throttle.scale = (MAX_SPEED, 0.488)
+        self.episode_length_s = 20
+        self.actions.throttle.scale = (MAX_SPEED, 3)
 
         self.observations.policy.enable_corruption = True
 
