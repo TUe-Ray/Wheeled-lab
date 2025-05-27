@@ -126,7 +126,7 @@ class DriftEventsCfg:
         func=reset_root_state_new,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [10, 10, 0.0],    # ← your desired start-point A
+            "pos": [0, 0, 0.0],    # ← your desired start-point A
             "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",

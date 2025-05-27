@@ -142,10 +142,10 @@ class reset_root_state_new(ManagerTermBase):
       - pos: [x, y, z] start coordinates (your point A)
       - rot: [qx, qy, qz, qw] start orientation
     """
-    def _init_(self, cfg: EventTermCfg, env: ManagerBasedEnv):
+    def __init__(self, cfg: EventTermCfg, env: ManagerBasedEnv):
         super()._init_(cfg, env)
 
-    def _call_(
+    def __call__(
         self,
         env: ManagerBasedEnv,
         env_ids: torch.Tensor,
