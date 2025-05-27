@@ -67,7 +67,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
     obstacle1 = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[2.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
             size=(1.0,1.0,3.0),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
@@ -111,16 +111,17 @@ class DriftEventsCfg:
     # on startup
 
     reset_root_state = EventTerm(
-        func=reset_root_state_along_track,
-        params={
-            "track_radius": LINE_RADIUS,
-            "track_straight_dist": STRAIGHT,
-            "num_points": 20,
-            "pos_noise": 0.5,
-            "yaw_noise": 1.0,
-            "asset_cfg": SceneEntityCfg("robot"),
-        },
+        func=mdp.set_root_state,
         mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "pose": {
+                "pos": [0.0, 0.0, 0.0],  # Point A
+                "rot": [1.0, 0.0, 0.0, 0.0],  # no rotation
+                "lin_vel": [0.0, 0.0, 0.0],
+                "ang_vel": [0.0, 0.0, 0.0],
+            }
+        }
     )
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
@@ -438,6 +439,13 @@ def reached_goal(env, goal=torch.tensor([5.0, 5.0]), thresh: float = 0.3):
 class GoalNavTerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    goal_reached = DoneTerm(
+        func=reached_goal,
+        params={
+            "goal": torch.tensor([5.0, 5.0]),  # Point B
+            "thresh": 0.3
+        }
+    )
 
     out_of_bounds = DoneTerm(
         func=cart_off_track,
