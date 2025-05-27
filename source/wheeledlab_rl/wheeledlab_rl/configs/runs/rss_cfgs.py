@@ -15,8 +15,8 @@ class RSS_DRIFT_CONFIG(RslRlRunConfig):
         rl_algo_lib="rsl",
         rl_algo_class="ppo",
         log=LogConfig(
-            video_interval=500
-            video_length = 600
+            video_interval=500,
+            video_length = 600,
         ),
     )
     agent_setup = AgentSetup(
