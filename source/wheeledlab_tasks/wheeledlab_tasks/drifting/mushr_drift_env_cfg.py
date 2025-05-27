@@ -508,8 +508,8 @@ class MushrDriftPlayEnvCfg(MushrDriftRLEnvCfg):
         )
     )
 
-    rewards: DriftRewardsCfg = None
-    terminations: DriftTerminationsCfg = None
+    rewards: TraverseABCfg = None
+    terminations: GoalNavTerminationsCfg = None
     curriculum: DriftCurriculumCfg = None
 
     def __post_init__(self):
