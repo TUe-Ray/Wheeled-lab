@@ -268,64 +268,112 @@ def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
     rew = torch.clamp(tlgr, min=0.)
     return rew
 
+def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=1.0):
+    pos = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    return torch.exp(-dist / scale)
+
+def lidar_obstacle_penalty(env, min_dist=0.3):
+    """
+    Penalize if obstacle is closer than min_dist in front of robot.
+    """
+    lidar: RayCaster = env.scene.sensors["ray_caster"]
+    hits = lidar.data.ray_hits_w  # (B x rays x 3)
+    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
+    dist = torch.norm(hits[..., :2] - robot_pos, dim=-1)  # B x rays
+    close_hits = (dist < min_dist).float()
+    return -close_hits.sum(dim=-1)
+
+def low_speed_penalty(env, low_speed_thresh: float=0.3):
+    lin_speed = torch.norm(mdp.base_lin_vel(env), dim=-1)
+    pen = torch.where(lin_speed < low_speed_thresh, 1., 0.)
+    return pen
+
+def forward_vel(env):
+    return mdp.base_lin_vel(env)[:, 0]
+
+def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
+    pos = mdp.root_pos_w(env)[..., :2]  # B x 2
+    vel = mdp.base_lin_vel(env)[..., :2]  # B x 2
+    to_goal = goal.to(env.device) - pos  # B x 2
+    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
+    vel_norm = torch.nn.functional.normalize(vel, dim=-1)
+    dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
+    return dot  # +1 when aligned, -1 when opposite
+
+def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
+    pos = mdp.root_pos_w(env)[..., :2]
+    dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
+    reached = dist_to_goal < reached_thresh
+    return reached.float() / env.episode_step_counter.clamp(min=1)
+
+def min_lidar_distance_penalty(env, threshold=0.5):
+    lidar: RayCaster = env.scene.sensors["ray_caster"]
+    hits = lidar.data.ray_hits_w  # (B x rays x 3)
+    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
+    dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
+    min_dist = torch.min(dists, dim=-1)[0]  # B
+    return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
+
+def collision_penalty_contact_sensor(env, threshold=5.0):
+    contact_sensor = env.scene.sensors["contact_sensor"]
+    net_forces = contact_sensor.data.net_forces_w_history  # B x T x N x 3
+    force_magnitudes = torch.norm(net_forces, dim=-1)  # B x T x N
+    max_force = torch.max(force_magnitudes, dim=(1, 2))[0]
+    return torch.where(max_force > threshold, -1.0, torch.zeros_like(max_force))
+
+def smooth_velocity_change(env):
+    vel = mdp.base_lin_vel(env)
+    delta = vel - env.prev_vel  # requires env.prev_vel to be tracked manually
+    return -torch.norm(delta, dim=-1)
+
+def low_angular_velocity(env):
+    ang_vel = mdp.base_ang_vel(env)
+    return -torch.abs(ang_vel[..., 2])  # Penalize yaw
+
+def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
+    pos = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    return torch.where(dist < threshold, 10.0, 0.0)
+
+
 @configclass
-class DriftRewardsCfg:
-
-    """Reward terms for the MDP."""
-    side_slip = RewTerm(
-        func=side_slip,
-        weight=10., # Increases over time
-        params={
-            "min_thresh": 0.25, # 15 degrees
-            "max_thresh": SLIP_THRESHOLD,
-            "min_vel_x": 1.0
-        }
+class TraverseABCfg:
+    goal_progress = RewTerm(
+        func=move_towards_goal,
+        weight=10.0,
     )
 
-    vel = RewTerm(
-        func=vel_dist,
-        weight=-5.,
-        params={
-            "speed_target": MAX_SPEED,
-            # "offset": 1.,
-        }
+    obstacle_avoidance = RewTerm(
+        func=lidar_obstacle_penalty,
+        weight=5.0,
+        params={"min_dist": 0.3},
     )
 
-    progress = RewTerm(
-        func=track_progress_rate,
-        weight=40.
+    alive = RewTerm(
+        func=mdp.rewards.is_alive,
+        weight=1.0,
     )
 
-#    tlgr = RewTerm(
-#        func=turn_left_go_right,
-#        params={"ang_vel_thresh": 1.},
-#        weight=0.,
-#    )
-
-    turn_energy = RewTerm(
-        func=energy_through_turn,
-        weight=20.,
-        params={"straight": STRAIGHT}
+    timeout_penalty = RewTerm(
+        func=mdp.rewards.is_terminated,
+        weight=-50.0,
     )
 
-    ## Penalties
-
-    cross_track = RewTerm(
-        func=cross_track_dist,
-        weight=-50.,
-        params={
-            "straight": STRAIGHT,
-            "track_radius": LINE_RADIUS,
-            "p": 1,
-            "offset": -1.,
-        }
+    low_speed_penalty = RewTerm(
+        func = low_speed_penalty,
+        weight = 2
     )
 
-    term_pens = RewTerm(
-        func = mdp.rewards.is_terminated_term,
-        params={"term_keys": ["out_of_bounds"]},
-        weight = -5000.,
+    forward_vel = RewTerm(
+        func = forward_vel,
+        weight = 2,
     )
+    align = RewTerm(func=goal_direction_alignment, weight=5.0)
+    avoid = RewTerm(func=min_lidar_distance_penalty, weight=3.0)
+    reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    time = RewTerm(func=time_efficiency, weight=10.0)
+    stable = RewTerm(func=low_angular_velocity, weight=1.0)
 
 
 ########################
@@ -338,7 +386,7 @@ class DriftCurriculumCfg:
     more_slip = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "side_slip",
+            "reward_term_name": "time_efficiency",
             "increase": 20.,
             "episodes_per_increase": 20,
             "max_increases": 10,
@@ -358,8 +406,8 @@ class DriftCurriculumCfg:
     more_term_pens = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "term_pens",
-            "increase": -1000.,
+            "reward_term_name": "min_lidar_distance",
+            "increase": -1.,
             "episodes_per_increase": 50,
             "max_increases": 5,
         }
@@ -376,8 +424,14 @@ def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radiu
     )
     return out
 
+def reached_goal(env, goal=torch.tensor([5.0, 5.0]), thresh: float = 0.3):
+    pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
+    goal  = goal.to(env.device).unsqueeze(0)           # 1 x 2
+    dist  = torch.norm(pos - goal, dim=-1)             # B
+    return dist < thresh
+
 @configclass
-class DriftTerminationsCfg:
+class GoalNavTerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
@@ -409,9 +463,9 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     actions: OriginActionCfg = OriginActionCfg()
 
     # MDP Settings
-    rewards: DriftRewardsCfg = DriftRewardsCfg()
+    rewards: TraverseABCfg = TraverseABCfg()
     events: DriftEventsCfg = DriftEventsRandomCfg()
-    terminations: DriftTerminationsCfg = DriftTerminationsCfg()
+    terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
     curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
 
     def __post_init__(self):
