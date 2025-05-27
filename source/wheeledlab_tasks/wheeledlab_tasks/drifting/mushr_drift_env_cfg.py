@@ -105,23 +105,30 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
+def reset_fixed_start(env: ManagerBasedEnv, env_ids, asset_cfg: SceneEntityCfg):
+    from isaaclab.assets import RigidObject, Articulation
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+
+    # Define fixed start pose
+    pos = torch.tensor([0.0, 0.0, 0.0], device=env.device).expand(len(env_ids), -1)
+    rot = torch.tensor([1.0, 0.0, 0.0, 0.0], device=env.device).expand(len(env_ids), -1)
+    pose = torch.cat([pos, rot], dim=-1)
+
+    asset.write_root_pose_to_sim(pose, env_ids=env_ids)
+    asset.write_root_velocity_to_sim(torch.zeros((len(env_ids), 6), device=env.device), env_ids=env_ids)
+
+
 
 @configclass
 class DriftEventsCfg:
     # on startup
 
     reset_root_state = EventTerm(
-        func=mdp.set_root_state,
+        func=reset_fixed_start,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pose": {
-                "pos": [0.0, 0.0, 0.0],  # Point A
-                "rot": [1.0, 0.0, 0.0, 0.0],  # no rotation
-                "lin_vel": [0.0, 0.0, 0.0],
-                "ang_vel": [0.0, 0.0, 0.0],
-            }
-        }
+        },
     )
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
