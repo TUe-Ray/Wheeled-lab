@@ -126,7 +126,7 @@ class DriftEventsCfg:
         func=reset_root_state_new,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [0, 0, 0.0],    # ← your desired start-point A
+            "pos": [-2, -3, 0.0],    # ← your desired start-point A
             "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",
@@ -355,12 +355,12 @@ def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
 class TraverseABCfg:
     goal_progress = RewTerm(
         func=move_towards_goal,
-        weight=10.0,
+        weight=20.0,
     )
 
     obstacle_avoidance = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=5.0,
+        weight=10.0,
         params={"min_dist": 0.3},
     )
 
@@ -376,15 +376,15 @@ class TraverseABCfg:
 
     low_speed_penalty = RewTerm(
         func = low_speed_penalty,
-        weight = 2
+        weight = 1
     )
 
     forward_vel = RewTerm(
         func = forward_vel,
-        weight = 2,
+        weight = 1,
     )
-    align = RewTerm(func=goal_direction_alignment, weight=5.0)
-    avoid = RewTerm(func=min_lidar_distance_penalty, weight=3.0)
+    align = RewTerm(func=goal_direction_alignment, weight=2.0)
+    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
     stable = RewTerm(func=low_angular_velocity, weight=1.0)
@@ -401,7 +401,7 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "time_efficiency",
-            "increase": 20.,
+            "increase": 1.,
             "episodes_per_increase": 20,
             "max_increases": 10,
         }
