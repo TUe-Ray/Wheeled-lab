@@ -439,8 +439,11 @@ def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radiu
 def reached_goal(env, goal=[5.0, 5.0], thresh: float = 0.3):
     pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
     goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
-    dist  = torch.norm(pos - goal, dim=-1)             # B
-    return dist < thresh
+    dist  = torch.norm(pos - goal, dim=-1)             # B]
+    reached = dist < thresh
+    if torch.any(reached):
+        print("stopped with pos:", pos, "dist to goal", dist)
+    return reached
 
 @configclass
 class GoalNavTerminationsCfg:
@@ -454,14 +457,14 @@ class GoalNavTerminationsCfg:
         }
     )
 
-    out_of_bounds = DoneTerm(
-        func=cart_off_track,
-        params={
-            "straight": STRAIGHT,
-            "corner_in_radius": CORNER_IN_RADIUS,
-            "corner_out_radius": CORNER_OUT_RADIUS
-        }
-    )
+#    out_of_bounds = DoneTerm(
+#        func=cart_off_track,
+#        params={
+#            "straight": STRAIGHT,
+#            "corner_in_radius": CORNER_IN_RADIUS,
+#            "corner_out_radius": CORNER_OUT_RADIUS
+#        }
+#    )
 
 ######################
 ###### RL ENV ########
@@ -498,7 +501,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 5
+        self.episode_length_s = 20
         self.actions.throttle.scale = (MAX_SPEED, 0.488)
 
         self.observations.policy.enable_corruption = True

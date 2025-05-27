@@ -428,7 +428,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 5
+        self.episode_length_s = 20
         self.actions.throttle.scale = (MAX_SPEED, 0.488)
 
         self.observations.policy.enable_corruption = True
