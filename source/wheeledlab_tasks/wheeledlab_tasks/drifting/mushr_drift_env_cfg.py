@@ -293,7 +293,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 _turn_buffers = None
 _buf_params = (None, None)
 
-def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.5):
+def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.5):
     global _turn_buffers, _buf_params
 
     dt = env.cfg.sim.dt * env.cfg.decimation
@@ -364,19 +364,19 @@ class TraverseABCfg:
 
    # encourage forward‐progress toward the goal
     step_toward = RewTerm(
-        func=partial(signed_velocity_toward_goal, goal=torch.tensor([5.0,5.0])),
+        func=signed_velocity_toward_goal,
         weight=20.0,
     )
 
     # penalize any movement away
     away_penalty = RewTerm(
-        func=partial(away_movement_penalty, goal=torch.tensor([5.0,5.0])),
+        func=away_movement_penalty
         weight=30.0,
     )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
-        func=partial(distance_penalty, goal=torch.tensor([5.0,5.0])),
+        func=distance_penalty,
         weight=10.0,
     )
 
@@ -386,12 +386,8 @@ class TraverseABCfg:
 
     # sustained turns (as before)
     sustained_turn = RewTerm(
-        func=partial(sustained_turn_reward, window_s=1.0, tr=0.5),
+        func=sustained_turn_reward
         weight=94.0,
-    )
-    sustained_small_turn = RewTerm(
-        func=partial(sustained_turn_reward, window_s=0.5, tr=0.2),
-        weight=40.0,
     )
 
 
@@ -407,7 +403,7 @@ class DriftCurriculumCfg:
         params={
             "reward_term_name": "sustained_turn",
             "increase": -9,
-            "episodes_per_increase": 20,
+            "episodes_per_increase": 4,
             "max_increases": 10,
         },
     )
