@@ -212,7 +212,7 @@ class DriftEventsCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "pos": [-2, -3, 0.0],    # ← your desired start-point A
-            "rot": [0.0, 0.0, 0.0, 0.0], # no initial yaw
+            "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",
     )
@@ -232,7 +232,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
     push_start = EventTerm(
     func=mdp.push_by_setting_velocity,
     mode="reset",
-    params={"velocity_range": {"yaw": (-6.0,6.0)}}
+    params={"velocity_range": {"yaw": (-2.0,2.0)}}
 )
 
     change_wheel_friction = EventTerm(
@@ -276,7 +276,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         mode="startup",
         params={
             "velocity_range":{
-                "yaw": (-5, 5)
+                "yaw": (-2, 2)
             },
         },
     )
