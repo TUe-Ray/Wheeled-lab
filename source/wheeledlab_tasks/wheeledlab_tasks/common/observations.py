@@ -16,19 +16,35 @@ from wheeledlab.envs.mdp import root_euler_xyz
 
 MAX_SPEED = 3.0
 
+# def wheel_encoder(env, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
+#     """
+#     Returns a tensor of shape (N_envs, 2): [v_left, v_right] [m/s]
+#     simply reading the joint velocities of the left & right wheels.
+#     """
+#     robot = env.scene[asset_cfg.name]               # Articulation
+#     # find the same joint indices you used in your action term:
+#     left_ids, _  = robot.find_joints(["front_left_wheel_joint", "rear_left_wheel_joint"])
+#     right_ids, _ = robot.find_joints(["front_right_wheel_joint", "rear_right_wheel_joint"])
+#     # joint_vel is (N_envs, n_joints)
+#     joint_vel = robot.data.joint_vel               # rad/s
+#     # convert from rad/s → m/s: v = ω * r
+#     r = 0.05  # wheel radius in your SkidSteerActionCfg
+#     v_left  = joint_vel[:, left_ids].mean(dim=-1) * r
+#     v_right = joint_vel[:, right_ids].mean(dim=-1) * r
+#     return torch.stack([v_left, v_right], dim=-1)
 def wheel_encoder(env, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
     """
     Returns a tensor of shape (N_envs, 2): [v_left, v_right] [m/s]
-    simply reading the joint velocities of the left & right wheels.
+    by reading the joint velocities of the left & right throttle joints.
     """
     robot = env.scene[asset_cfg.name]               # Articulation
-    # find the same joint indices you used in your action term:
-    left_ids, _  = robot.find_joints(["front_left_wheel_joint", "rear_left_wheel_joint"])
-    right_ids, _ = robot.find_joints(["front_right_wheel_joint", "rear_right_wheel_joint"])
+    # match the actual throttle joint names on your robot
+    left_ids, _  = robot.find_joints([".*left_wheel_throttle"])
+    right_ids, _ = robot.find_joints([".*right_wheel_throttle"])
     # joint_vel is (N_envs, n_joints)
     joint_vel = robot.data.joint_vel               # rad/s
     # convert from rad/s → m/s: v = ω * r
-    r = 0.05  # wheel radius in your SkidSteerActionCfg
+    r = 0.05  # wheel radius from your action cfg
     v_left  = joint_vel[:, left_ids].mean(dim=-1) * r
     v_right = joint_vel[:, right_ids].mean(dim=-1) * r
     return torch.stack([v_left, v_right], dim=-1)
