@@ -140,6 +140,9 @@ class DriftEventsCfg:
 #        },
 #        mode="reset",
 #    )
+    reset_progress_tracker: EventTermCfg = None
+    step_progress_tracker:  EventTermCfg = None
+
     reset_progress = EventTerm(
         func=reset_progress_tracker,
         mode="reset",
@@ -519,7 +522,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
 
     # MDP Settings
     rewards: TraverseABCfg = TraverseABCfg()
-    events: DriftEventsRandomCfg = DriftEventsRandomCfg()
+    events: DriftEventsCfg = DriftEventsRandomCfg()
     terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
     curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
 
