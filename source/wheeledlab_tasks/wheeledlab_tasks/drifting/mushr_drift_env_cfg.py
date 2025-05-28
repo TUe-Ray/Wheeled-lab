@@ -47,43 +47,20 @@ from collections import deque
 
 
 _turn_buffers = None
-
-def sustained_turn_reward(env, env_ids=None, window_s: float = 1.0):
+def clear_turn_buffers(env, env_ids):
     global _turn_buffers
-
-    # how many steps correspond to our window of time
-    dt = env.cfg.sim.dt * env.decimation
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # initialize once
-    if _turn_buffers is None:
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-
-    # — RESET callback — clear only those envs
-    if env_ids is not None:
-        # normalize env_ids to a list of ints
+    if _turn_buffers is not None:
+        # normalize env_ids → list of ints
         if isinstance(env_ids, slice):
-            ids = list(range(N))
+            ids = range(env.num_envs)
         elif hasattr(env_ids, "tolist"):
             ids = env_ids.tolist()
         else:
             ids = list(env_ids)
         for i in ids:
             _turn_buffers[i].clear()
-        # must return a tensor of zeros, but IsaacLab will ignore it
-        return torch.zeros(N, device=env.device)
-
-    # — STEP callback — update buffers & compute reward
-    out = torch.zeros(N, device=env.device)
-    w = mdp.base_ang_vel(env)[..., 2]  # (N,) yaw rates
-    for i in range(N):
-        _turn_buffers[i].append(float(w[i].cpu()))
-        if len(_turn_buffers[i]) == window_steps:
-            avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.3:
-                out[i] = abs(avg_w)
-    return out
+    # return a dummy tensor so IsaacLab is happy
+    return torch.zeros(env.num_envs, device=env.device)
 ###################
 ###### SCENE ######
 ###################
@@ -195,10 +172,10 @@ class DriftEventsCfg:
         },
         mode="reset",
     )
-    report_terms = EventTerm(  # or any “reset” event
-    func=sustained_turn_reward,
-    mode="reset",
-)
+    clear_turn = EventTerm(
+        func=clear_turn_buffers,
+        mode="reset",
+    )
 
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
@@ -435,6 +412,28 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     #print("Progress:" , prog)
     return prog
 
+def sustained_turn_reward(env, window_s: float = 1.0):
+    global _turn_buffers
+    # compute how many sim‐steps fit in window_s
+    dt = env.cfg.sim.dt * env.decimation
+    window_steps = max(1, int(window_s / dt))
+    N = env.num_envs
+
+    # lazy‐init one deque per env
+    if _turn_buffers is None:
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+
+    out = torch.zeros(N, device=env.device)
+    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
+
+    for i in range(N):
+        _turn_buffers[i].append(float(w[i].cpu()))
+        if len(_turn_buffers[i]) == window_steps:
+            avg_w = sum(_turn_buffers[i]) / window_steps
+            if abs(avg_w) > 0.3:  # reward only sustained “big” turns
+                out[i] = abs(avg_w)
+
+    return out
 
 @configclass
 class TraverseABCfg:
