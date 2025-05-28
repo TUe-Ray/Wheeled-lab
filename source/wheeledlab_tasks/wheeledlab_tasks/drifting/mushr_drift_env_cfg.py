@@ -435,6 +435,29 @@ def sustained_turn_reward(env, window_s: float = 1.0):
 
     return out
 
+def sustained_small_turn_reward(env, window_s: float = 0.5):
+    global _turn_buffers
+    # compute how many sim‐steps fit in window_s
+    dt = env.cfg.sim.dt * env.cfg.decimation
+    window_steps = max(1, int(window_s / dt))
+    N = env.num_envs
+
+    # lazy‐init one deque per env
+    if _turn_buffers is None:
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+
+    out = torch.zeros(N, device=env.device)
+    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
+
+    for i in range(N):
+        _turn_buffers[i].append(float(w[i].cpu()))
+        if len(_turn_buffers[i]) == window_steps:
+            avg_w = sum(_turn_buffers[i]) / window_steps
+            if abs(avg_w) > 0.1:  # reward only sustained “big” turns
+                out[i] = abs(avg_w)
+
+    return out
+
 
 @configclass
 class TraverseABCfg:
@@ -448,10 +471,10 @@ class TraverseABCfg:
         func=step_progress,
         weight=.0,
     )
-    forward = RewTerm(
-        func=velocity_toward_goal,
-        weight=10.0,
-    )
+    # forward = RewTerm(
+    #     func=velocity_toward_goal,
+    #     weight=10.0,
+    # )
     alive = RewTerm(
         func=mdp.rewards.is_alive,
         weight=1.0,
@@ -480,6 +503,10 @@ class TraverseABCfg:
         weight= 94,
     )
 
+    sustained_small_turn = RewTerm(
+        func=sustained_small_turn_reward,
+        weight= 94,
+    )
 
 ########################
 ###### CURRICULUM ######
@@ -585,7 +612,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 10
-        self.actions.throttle.scale = (MAX_SPEED, 0.488)
+        self.actions.throttle.scale = (MAX_SPEED, 3)
 
         self.observations.policy.enable_corruption = True
 
