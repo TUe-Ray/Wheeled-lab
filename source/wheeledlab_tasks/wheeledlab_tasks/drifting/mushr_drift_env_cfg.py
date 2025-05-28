@@ -229,6 +229,12 @@ class DriftEventsCfg:
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
 
+    push_start = EventTerm(
+    func=mdp.push_by_setting_velocity,
+    mode="reset",
+    params={"velocity_range": {"yaw": (-1.0,1.0)}}
+)
+
     change_wheel_friction = EventTerm(
         func=mdp.randomize_rigid_body_material,
         mode="startup",
@@ -252,29 +258,29 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         },
     )
 
-    # push_robots_hf = EventTerm( # High frequency small pushes
-    #     func=mdp.push_by_setting_velocity,
-    #     mode="interval",
-    #     interval_range_s=(0.1, 0.4),
-    #     params={
-    #         "velocity_range":{
-    #             "x": (-0.1, 0.1),
-    #             "y": (-0.03, 0.03),
-    #             "yaw": (-0.6, 0.6)
-    #         },
-    #     },
-    # )
+    push_robots_hf = EventTerm( # High frequency small pushes
+        func=mdp.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(0.1, 0.4),
+        params={
+            "velocity_range":{
+                "x": (-0.1, 0.1),
+                "y": (-0.03, 0.03),
+                "yaw": (-0.6, 0.6)
+            },
+        },
+    )
 
-    # push_robots_lf = EventTerm( # Low frequency large pushes
-    #     func=mdp.push_by_setting_velocity,
-    #     mode="reset",
-    #     interval_range_s=(0.8, 1.2),
-    #     params={
-    #         "velocity_range":{
-    #             "yaw": (-1.5, 1.5)
-    #         },
-    #     },
-    # )
+    push_robots_lf = EventTerm( # Low frequency large pushes
+        func=mdp.push_by_setting_velocity,
+        mode="reset",
+        interval_range_s=(0.8, 1.2),
+        params={
+            "velocity_range":{
+                "yaw": (-1.5, 1.5)
+            },
+        },
+    )
 
     add_base_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
