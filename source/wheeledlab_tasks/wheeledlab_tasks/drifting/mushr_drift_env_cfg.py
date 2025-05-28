@@ -278,7 +278,7 @@ def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
     rew = torch.clamp(tlgr, min=0.)
     return rew
 
-def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=1.0):
+def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=10):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     return torch.exp(-dist / scale)
@@ -360,7 +360,7 @@ class TraverseABCfg:
 
     obstacle_avoidance = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=10.0,
+        weight=1.0,
         params={"min_dist": 0.3},
     )
 
@@ -383,11 +383,12 @@ class TraverseABCfg:
         func = forward_vel,
         weight = 1,
     )
-    align = RewTerm(func=goal_direction_alignment, weight=2.0)
+    align = RewTerm(func=goal_direction_alignment, weight=-5.0)
     avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    nocrash = RewTerm(func = collision_penalty_contact_sensor, weight = 10)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
-    stable = RewTerm(func=low_angular_velocity, weight=1.0)
+    stable = RewTerm(func=low_angular_velocity, weight=-5.0)
 
 
 ########################
