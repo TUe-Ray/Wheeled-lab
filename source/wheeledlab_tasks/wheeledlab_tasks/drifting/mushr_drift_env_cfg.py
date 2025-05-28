@@ -329,12 +329,6 @@ def min_lidar_distance_penalty(env, threshold=0.5):
     min_dist = torch.min(dists, dim=-1)[0]  # B
     return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
 
-def collision_penalty_contact_sensor(env, threshold=5.0):
-    contact_sensor = env.scene.sensors["contact_sensor"]
-    net_forces = contact_sensor.data.net_forces_w_history  # B x T x N x 3
-    force_magnitudes = torch.norm(net_forces, dim=-1)  # B x T x N
-    max_force = torch.max(force_magnitudes, dim=(1, 2))[0]
-    return torch.where(max_force > threshold, -1.0, torch.zeros_like(max_force))
 
 def smooth_velocity_change(env):
     vel = mdp.base_lin_vel(env)
@@ -385,7 +379,6 @@ class TraverseABCfg:
     )
     align = RewTerm(func=goal_direction_alignment, weight=-5.0)
     avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
-    nocrash = RewTerm(func = collision_penalty_contact_sensor, weight = 10)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
     stable = RewTerm(func=low_angular_velocity, weight=-5.0)
