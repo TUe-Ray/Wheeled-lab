@@ -66,19 +66,7 @@ def _reset_and_report(env):
     return None
 
 
-# ─── instantiate your wrappers here (module-level!) ────────────────────────
-wrapped_goal_progress        = _make_debug_wrapper("goal_progress",        move_towards_goal)
-wrapped_obstacle_avoidance   = _make_debug_wrapper("obstacle_avoidance",   lidar_obstacle_penalty)
-wrapped_forward              = _make_debug_wrapper("forward",              velocity_toward_goal)
-wrapped_alive                = _make_debug_wrapper("alive",                mdp.rewards.is_alive)
-wrapped_timeout_penalty      = _make_debug_wrapper("timeout_penalty",      mdp.rewards.is_terminated)
-wrapped_align                = _make_debug_wrapper("align",                goal_direction_alignment)
-wrapped_avoid                = _make_debug_wrapper("avoid",                min_lidar_distance_penalty)
-wrapped_reach                = _make_debug_wrapper("reach",                goal_reached_reward)
-wrapped_time                 = _make_debug_wrapper("time",                 time_efficiency)
-wrapped_steer                = _make_debug_wrapper("steer",                high_angular_velocity)
 
-# ─── now point your configclass at these real callables ────────────────────
 ###################
 ###### SCENE ######
 ###################
@@ -419,6 +407,20 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
         prog = _prev_dist - dist
     _prev_dist = dist.clone()
     return prog
+
+# ─── instantiate your wrappers here (module-level!) ────────────────────────
+wrapped_goal_progress        = _make_debug_wrapper("goal_progress",        move_towards_goal)
+wrapped_obstacle_avoidance   = _make_debug_wrapper("obstacle_avoidance",   lidar_obstacle_penalty)
+wrapped_forward              = _make_debug_wrapper("forward",              velocity_toward_goal)
+wrapped_alive                = _make_debug_wrapper("alive",                mdp.rewards.is_alive)
+wrapped_timeout_penalty      = _make_debug_wrapper("timeout_penalty",      mdp.rewards.is_terminated)
+wrapped_align                = _make_debug_wrapper("align",                goal_direction_alignment)
+wrapped_avoid                = _make_debug_wrapper("avoid",                min_lidar_distance_penalty)
+wrapped_reach                = _make_debug_wrapper("reach",                goal_reached_reward)
+wrapped_time                 = _make_debug_wrapper("time",                 time_efficiency)
+wrapped_steer                = _make_debug_wrapper("steer",                high_angular_velocity)
+
+# ─── now point your configclass at these real callables ────────────────────
 
 @configclass
 class TraverseABCfg:
