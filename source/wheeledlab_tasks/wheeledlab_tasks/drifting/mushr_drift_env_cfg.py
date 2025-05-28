@@ -42,7 +42,26 @@ def reset_progress_tracker(env, env_ids):
     _prev_dist = None
     return None   # EventTerms always expect a return, even if you don’t use it
 
+_term_buffers = defaultdict(list)
 
+def _make_debug_wrapper(term_name, func):
+    """Returns a wrapped version of your term func that logs its batch-mean each step."""
+    def _wrapped(env, **params):
+        vals = func(env, **params)               # original per-env vector, shape (B,)
+        m = float(vals.mean().cpu())             # scalar mean across envs
+        _term_buffers[term_name].append(m)       # stash it
+        return vals                              # return original vector so IsaacLab can sum it
+    return _wrapped
+
+def _reset_and_report(env):
+    """EventTerm (mode=reset) that prints & clears all buffers at episode boundary."""
+    if _term_buffers:
+        print("⎡ Episode term-means ⎤")
+        for name, buf in _term_buffers.items():
+            print(f" {name:20s} → {np.mean(buf):.4f}")
+        print("⎣" + "─"*30 + "⎦")
+        _term_buffers.clear()
+    return None
 
 ###################
 ###### SCENE ######
@@ -141,7 +160,10 @@ class DriftEventsCfg:
 #        mode="reset",
 #    )
 
-
+    report_terms = EventTerm(
+        func=_reset_and_report,
+        mode="reset",
+    )
     reset_progress = EventTerm(
         func=reset_progress_tracker,
         mode="reset",
@@ -354,14 +376,10 @@ def min_lidar_distance_penalty(env, threshold=0.5):
     return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
 
 
-def smooth_velocity_change(env):
-    vel = mdp.base_lin_vel(env)
-    delta = vel - env.prev_vel  # requires env.prev_vel to be tracked manually
-    return -torch.norm(delta, dim=-1)
 
 def high_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
-    return torch.abs(ang_vel[..., 2])  # Penalize yaw
+    return torch.abs(ang_vel[..., 2])  
 
 def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     pos = mdp.root_pos_w(env)[..., :2]
@@ -386,51 +404,50 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     _prev_dist = dist.clone()
     return prog
 
-
 @configclass
 class TraverseABCfg:
     goal_progress = RewTerm(
-        func=move_towards_goal,
+        func=_make_debug_wrapper("goal_progress", move_towards_goal),
         weight=20.0,
     )
-
     obstacle_avoidance = RewTerm(
-        func=lidar_obstacle_penalty,
+        func=_make_debug_wrapper("obstacle_avoidance", lidar_obstacle_penalty),
         weight=1.0,
         params={"min_dist": 0.3},
     )
-    step_progress = RewTerm(
-        func=step_progress,
-        weight=.0,
-    )
     forward = RewTerm(
-        func=velocity_toward_goal,
+        func=_make_debug_wrapper("forward", velocity_toward_goal),
         weight=10.0,
     )
     alive = RewTerm(
-        func=mdp.rewards.is_alive,
+        func=_make_debug_wrapper("alive", mdp.rewards.is_alive),
         weight=1.0,
     )
-
     timeout_penalty = RewTerm(
-        func=mdp.rewards.is_terminated,
+        func=_make_debug_wrapper("timeout_penalty", mdp.rewards.is_terminated),
         weight=-50.0,
     )
+    align = RewTerm(
+        func=_make_debug_wrapper("align", goal_direction_alignment),
+        weight= 5.0,
+    )
+    avoid = RewTerm(
+        func=_make_debug_wrapper("avoid", min_lidar_distance_penalty),
+        weight= 2.0,
+    )
+    reach = RewTerm(
+        func=_make_debug_wrapper("reach", goal_reached_reward),
+        weight=50.0,
+    )
+    time = RewTerm(
+        func=_make_debug_wrapper("time", time_efficiency),
+        weight=10.0,
+    )
+    steer = RewTerm(
+        func=_make_debug_wrapper("steer", high_angular_velocity),
+        weight= 5.0,
+    )
 
-    # low_speed_penalty = RewTerm(
-    #     func = low_speed_penalty,
-    #     weight = 1
-    # )
-
-    # forward_vel = RewTerm(
-    #    func = forward_vel,
-    #    weight = 1,
-    # )
-    align = RewTerm(func=goal_direction_alignment, weight=5.0)
-    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
-    reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    #time = RewTerm(func=time_efficiency, weight=10.0)
-    steer = RewTerm(func=high_angular_velocity, weight=50)
 
 
 ########################
