@@ -34,6 +34,16 @@ STRAIGHT = 0.8                # Shaping
 SLIP_THRESHOLD = 0.55         # (rad) For reward
 MAX_SPEED = 3.0               # (m/s) For action and reward
 
+# somewhere at top‐level of your script
+_prev_dist = None
+
+def reset_progress_tracker(env):
+    global _prev_dist
+    _prev_dist = None
+    return None   # EventTerms always expect a return, even if you don’t use it
+
+
+
 ###################
 ###### SCENE ######
 ###################
@@ -130,6 +140,10 @@ class DriftEventsCfg:
 #        },
 #        mode="reset",
 #    )
+    reset_progress = EventTerm(
+        func=reset_progress_tracker,
+        mode="reset",
+    )
     reset_root_state = EventTerm(
         func=reset_root_state_new,
         params={
@@ -359,6 +373,18 @@ def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     to_g = torch.nn.functional.normalize(to_g, dim=-1)
     return (vel * to_g).sum(dim=-1)         # positive when you move toward the goal
 
+def step_progress(env, goal=torch.tensor([5.0,5.0])):
+    global _prev_dist
+    pos  = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    if _prev_dist is None:
+        prog = torch.zeros_like(dist)
+    else:
+        prog = _prev_dist - dist
+    _prev_dist = dist.clone()
+    return prog
+
+
 @configclass
 class TraverseABCfg:
     goal_progress = RewTerm(
@@ -370,6 +396,10 @@ class TraverseABCfg:
         func=lidar_obstacle_penalty,
         weight=1.0,
         params={"min_dist": 0.3},
+    )
+    step_progress = RewTerm(
+        func=step_progress,
+        weight=20.0,
     )
     forward = RewTerm(
         func=velocity_toward_goal,
@@ -394,11 +424,11 @@ class TraverseABCfg:
     #    func = forward_vel,
     #    weight = 1,
     # )
-    align = RewTerm(func=goal_direction_alignment, weight=-5.0)
+    align = RewTerm(func=goal_direction_alignment, weight=5.0)
     avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    time = RewTerm(func=time_efficiency, weight=10.0)
-    steer = RewTerm(func=high_angular_velocity, weight=5.0)
+    #time = RewTerm(func=time_efficiency, weight=10.0)
+    steer = RewTerm(func=high_angular_velocity, weight=50)
 
 
 ########################
@@ -407,35 +437,26 @@ class TraverseABCfg:
 
 @configclass
 class DriftCurriculumCfg:
-
-    stable_decay = CurrTerm(
+    # Every 20 eps reduce the alignment reward by 4, up to 5 times (20→0)
+    decay_align = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "stable",
-            "increase": -1.0,               # negative → decay over time
-            "episodes_per_increase": 20,    # every 20 eps
-            "max_increases": 5,             # cap total change at -5
-        }
+            "reward_term_name": "steer",
+            "increase": -8.0,
+            "episodes_per_increase": 20,
+            "max_increases": 5,
+        },
     )
-#    more_tlgr = CurrTerm(
-#        func=increase_reward_weight_over_time,
-#        params={
-#            "reward_term_name": "tlgr",
-#            "increase": 10.,
-#            "episodes_per_increase": 20,
-#            "max_increases": 5,
-#        }
-#    )
-
-    # more_term_pens = CurrTerm(
-    #     func=increase_reward_weight_over_time,
-    #     params={
-    #         "reward_term_name": "min_lidar_distance",
-    #         "increase": -1.,
-    #         "episodes_per_increase": 50,
-    #         "max_increases": 5,
-    #     }
-    # )
+    # Every 20 eps increase the progress reward by 2, up to 10 times (1→21)
+    grow_progress = CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "step_progress",
+            "increase": 2.0,
+            "episodes_per_increase": 20,
+            "max_increases": 10,
+        },
+    )
 
 ##########################
 ###### TERMINATION #######

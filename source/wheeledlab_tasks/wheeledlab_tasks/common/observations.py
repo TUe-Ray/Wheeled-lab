@@ -58,6 +58,13 @@ def lidar_distances(env, sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster
     dists = torch.norm(hits - origin, dim=-1)     # (N, B)
     return dists
 
+
+def rel_heading(env, goal=torch.tensor([5.0,5.0])):
+    pos = mdp.root_pos_w(env)[..., :2]
+    yaw = mdp.root_euler_xyz(env)[..., 2]
+    to_goal = torch.atan2(goal[1]-pos[...,1], goal[0]-pos[...,0])
+    Δ = ((to_goal - yaw + torch.pi) % (2*torch.pi)) - torch.pi
+    return Δ.unsqueeze(-1)  # shape (B,1)
 ### Commonly used observation terms with emprically determined noise levels
 
 @configclass
@@ -93,6 +100,13 @@ class BlindObsCfg:
             clip=(0.0,50.0)
 
         )
+
+        rel_heading_term = ObsTerm(
+            func=rel_heading,
+            clip=(-torch.pi, torch.pi),
+            noise=None
+        )
+
 
         last_action_term = ObsTerm( # [m/s, (-1, 1)]
             func=mdp.last_action,
