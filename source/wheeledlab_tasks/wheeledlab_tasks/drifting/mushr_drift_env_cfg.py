@@ -68,7 +68,7 @@ def signed_velocity_to_goal(env, goal=torch.tensor([5.0, 5.0])):
     vel = mdp.base_lin_vel(env)[..., :2]
     # compute unit “to-goal” vectors
     to_goal = goal.to(env.device) - pos                   # (B,2)
-    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
+    to_goal_norm = torch.nn.functional.normalize(to_goal+0.0001, dim=-1)
     # dot product: positive if your velocity has a component toward the goal,
     # negative if it points away
     return (vel * to_goal_norm).sum(dim=-1)                # (B,)
@@ -85,7 +85,7 @@ def reset_dist_tracker(env, env_ids):
 def step_progress(env, goal=torch.tensor([5.0, 5.0])):
     global _prev_dists
     pos = mdp.root_pos_w(env)[..., :2]           # (B,2)
-    dists = torch.norm(goal.to(env.device) - pos, dim=-1)  # (B,)
+    dists = torch.norm(goal.to(env.device) - pos + 0.00001, dim=-1)  # (B,)
 
     if _prev_dists is None:
         # first call after reset → no progress
