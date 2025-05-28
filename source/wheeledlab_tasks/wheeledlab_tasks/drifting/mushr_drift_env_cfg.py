@@ -387,7 +387,7 @@ class TraverseABCfg:
     # sustained turns (as before)
     sustained_turn = RewTerm(
         func=sustained_turn_reward,
-        weight=94.0,
+        weight=905.0,
     )
 
 
@@ -402,17 +402,8 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
-            "increase": -9,
+            "increase": -90,
             "episodes_per_increase": 4,
-            "max_increases": 10,
-        },
-    )
-    decay_small_turn = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "sustained_small_turn",
-            "increase": -9,
-            "episodes_per_increase": 20,
             "max_increases": 10,
         },
     )
