@@ -393,12 +393,12 @@ def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     return torch.where(dist < threshold, 10.0, 0.0)
 
 def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
-    pos  = mdp.root_pos_w(env)[..., :2]    # (B,2)
-    vel  = mdp.base_lin_vel(env)[..., :2]  # (B,2)
-    to_g = goal.to(env.device) - pos       # (B,2)
+    pos  = mdp.root_pos_w(env)[..., :2]
+    vel  = mdp.base_lin_vel(env)[..., :2]
+    to_g = goal.to(env.device) - pos
     to_g = torch.nn.functional.normalize(to_g, dim=-1)
-    #print("Velocity_towards_goal",  (vel * to_g).sum(dim=-1))
-    return (vel * to_g).sum(dim=-1)         # positive when you move toward the goal
+    raw = (vel * to_g).sum(dim=-1)
+    return torch.relu(raw)
 
 def step_progress(env, goal=torch.tensor([5.0,5.0])):
     global _prev_dist
@@ -435,12 +435,9 @@ def sustained_turn_reward(env, window_s: float = 1.0):
 
     return out
 
+
 @configclass
 class TraverseABCfg:
-    goal_progress = RewTerm(
-        func=move_towards_goal,
-        weight=20.0,
-    )
 
     # #obstacle_avoidance = RewTerm(
     #     func=lidar_obstacle_penalty,
