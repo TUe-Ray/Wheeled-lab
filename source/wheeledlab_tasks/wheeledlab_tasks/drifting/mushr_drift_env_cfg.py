@@ -8,6 +8,7 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
+from isaaclab.sim import SphereCfg, PreviewSurfaceCfg
 from isaaclab.managers import (
     EventTermCfg as EventTerm,
     RewardTermCfg as RewTerm,
