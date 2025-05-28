@@ -337,7 +337,7 @@ def smooth_velocity_change(env):
 
 def low_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
-    return -torch.abs(ang_vel[..., 2])  # Penalize yaw
+    return torch.abs(ang_vel[..., 2])  # Penalize yaw
 
 def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     pos = mdp.root_pos_w(env)[..., :2]
@@ -352,36 +352,36 @@ class TraverseABCfg:
         weight=20.0,
     )
 
-    obstacle_avoidance = RewTerm(
-        func=lidar_obstacle_penalty,
-        weight=1.0,
-        params={"min_dist": 0.3},
-    )
+    # obstacle_avoidance = RewTerm(
+    #     func=lidar_obstacle_penalty,
+    #     weight=1.0,
+    #     params={"min_dist": 0.3},
+    # )
 
     alive = RewTerm(
         func=mdp.rewards.is_alive,
         weight=1.0,
     )
 
-    timeout_penalty = RewTerm(
-        func=mdp.rewards.is_terminated,
-        weight=-50.0,
-    )
+    # timeout_penalty = RewTerm(
+    #     func=mdp.rewards.is_terminated,
+    #     weight=-50.0,
+    # )
 
-    low_speed_penalty = RewTerm(
-        func = low_speed_penalty,
-        weight = 1
-    )
+    # low_speed_penalty = RewTerm(
+    #     func = low_speed_penalty,
+    #     weight = 1
+    # )
 
-    forward_vel = RewTerm(
-        func = forward_vel,
-        weight = 1,
-    )
-    align = RewTerm(func=goal_direction_alignment, weight=-5.0)
-    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
-    reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    time = RewTerm(func=time_efficiency, weight=10.0)
-    stable = RewTerm(func=low_angular_velocity, weight=-5.0)
+    #forward_vel = RewTerm(
+    #    func = forward_vel,
+    #    weight = 1,
+    #)
+    #align = RewTerm(func=goal_direction_alignment, weight=-5.0)
+    #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    #reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    #time = RewTerm(func=time_efficiency, weight=10.0)
+    stable = RewTerm(func=low_angular_velocity, weight=5.0)
 
 
 ########################
@@ -391,16 +391,15 @@ class TraverseABCfg:
 @configclass
 class DriftCurriculumCfg:
 
-    more_slip = CurrTerm(
+    stable_decay = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "time_efficiency",
-            "increase": 1.,
-            "episodes_per_increase": 20,
-            "max_increases": 10,
+            "reward_term_name": "stable",
+            "increase": -1.0,               # negative → decay over time
+            "episodes_per_increase": 20,    # every 20 eps
+            "max_increases": 5,             # cap total change at -5
         }
     )
-
 #    more_tlgr = CurrTerm(
 #        func=increase_reward_weight_over_time,
 #        params={
@@ -411,15 +410,15 @@ class DriftCurriculumCfg:
 #        }
 #    )
 
-    more_term_pens = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "min_lidar_distance",
-            "increase": -1.,
-            "episodes_per_increase": 50,
-            "max_increases": 5,
-        }
-    )
+    # more_term_pens = CurrTerm(
+    #     func=increase_reward_weight_over_time,
+    #     params={
+    #         "reward_term_name": "min_lidar_distance",
+    #         "increase": -1.,
+    #         "episodes_per_increase": 50,
+    #         "max_increases": 5,
+    #     }
+    # )
 
 ##########################
 ###### TERMINATION #######
