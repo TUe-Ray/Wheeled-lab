@@ -399,7 +399,7 @@ class TraverseABCfg:
     )
     step_progress = RewTerm(
         func=step_progress,
-        weight=20.0,
+        weight=.0,
     )
     forward = RewTerm(
         func=velocity_toward_goal,
@@ -519,7 +519,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
 
     # MDP Settings
     rewards: TraverseABCfg = TraverseABCfg()
-    events: DriftEventsCfg = DriftEventsRandomCfg()
+    events: DriftEventsRandomCfg = DriftEventsRandomCfg()
     terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
     curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
 
