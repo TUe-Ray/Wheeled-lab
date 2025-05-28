@@ -65,6 +65,20 @@ def _reset_and_report(env):
         _term_buffers.clear()
     return None
 
+
+# ─── instantiate your wrappers here (module-level!) ────────────────────────
+wrapped_goal_progress        = _make_debug_wrapper("goal_progress",        move_towards_goal)
+wrapped_obstacle_avoidance   = _make_debug_wrapper("obstacle_avoidance",   lidar_obstacle_penalty)
+wrapped_forward              = _make_debug_wrapper("forward",              velocity_toward_goal)
+wrapped_alive                = _make_debug_wrapper("alive",                mdp.rewards.is_alive)
+wrapped_timeout_penalty      = _make_debug_wrapper("timeout_penalty",      mdp.rewards.is_terminated)
+wrapped_align                = _make_debug_wrapper("align",                goal_direction_alignment)
+wrapped_avoid                = _make_debug_wrapper("avoid",                min_lidar_distance_penalty)
+wrapped_reach                = _make_debug_wrapper("reach",                goal_reached_reward)
+wrapped_time                 = _make_debug_wrapper("time",                 time_efficiency)
+wrapped_steer                = _make_debug_wrapper("steer",                high_angular_velocity)
+
+# ─── now point your configclass at these real callables ────────────────────
 ###################
 ###### SCENE ######
 ###################
@@ -408,47 +422,58 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
 
 @configclass
 class TraverseABCfg:
-    goal_progress = RewTerm(
-        func=_make_debug_wrapper("goal_progress", move_towards_goal),
-        weight=20.0,
-    )
-    obstacle_avoidance = RewTerm(
-        func=_make_debug_wrapper("obstacle_avoidance", lidar_obstacle_penalty),
-        weight=1.0,
-        params={"min_dist": 0.3},
-    )
-    forward = RewTerm(
-        func=_make_debug_wrapper("forward", velocity_toward_goal),
-        weight=10.0,
-    )
-    alive = RewTerm(
-        func=_make_debug_wrapper("alive", mdp.rewards.is_alive),
-        weight=1.0,
-    )
-    timeout_penalty = RewTerm(
-        func=_make_debug_wrapper("timeout_penalty", mdp.rewards.is_terminated),
-        weight=-50.0,
-    )
-    align = RewTerm(
-        func=_make_debug_wrapper("align", goal_direction_alignment),
-        weight= 5.0,
-    )
-    avoid = RewTerm(
-        func=_make_debug_wrapper("avoid", min_lidar_distance_penalty),
-        weight= 2.0,
-    )
-    reach = RewTerm(
-        func=_make_debug_wrapper("reach", goal_reached_reward),
-        weight=50.0,
-    )
-    time = RewTerm(
-        func=_make_debug_wrapper("time", time_efficiency),
-        weight=10.0,
-    )
-    steer = RewTerm(
-        func=_make_debug_wrapper("steer", high_angular_velocity),
-        weight= 5.0,
-    )
+    goal_progress       = RewTerm(func=wrapped_goal_progress,      weight=20.0)
+    obstacle_avoidance  = RewTerm(func=wrapped_obstacle_avoidance, weight= 1.0, params={"min_dist":0.3})
+    forward             = RewTerm(func=wrapped_forward,           weight=10.0)
+    alive               = RewTerm(func=wrapped_alive,             weight= 1.0)
+    timeout_penalty     = RewTerm(func=wrapped_timeout_penalty,   weight=-50.0)
+    align               = RewTerm(func=wrapped_align,             weight= 5.0)
+    avoid               = RewTerm(func=wrapped_avoid,             weight= 2.0)
+    reach               = RewTerm(func=wrapped_reach,             weight=50.0)
+    time                = RewTerm(func=wrapped_time,              weight=10.0)
+    steer               = RewTerm(func=wrapped_steer,             weight= 5.0)
+
+    # goal_progress = RewTerm(
+    #     func=_make_debug_wrapper("goal_progress", move_towards_goal),
+    #     weight=20.0,
+    # )
+    # obstacle_avoidance = RewTerm(
+    #     func=_make_debug_wrapper("obstacle_avoidance", lidar_obstacle_penalty),
+    #     weight=1.0,
+    #     params={"min_dist": 0.3},
+    # )
+    # forward = RewTerm(
+    #     func=_make_debug_wrapper("forward", velocity_toward_goal),
+    #     weight=10.0,
+    # )
+    # alive = RewTerm(
+    #     func=_make_debug_wrapper("alive", mdp.rewards.is_alive),
+    #     weight=1.0,
+    # )
+    # timeout_penalty = RewTerm(
+    #     func=_make_debug_wrapper("timeout_penalty", mdp.rewards.is_terminated),
+    #     weight=-50.0,
+    # )
+    # align = RewTerm(
+    #     func=_make_debug_wrapper("align", goal_direction_alignment),
+    #     weight= 5.0,
+    # )
+    # avoid = RewTerm(
+    #     func=_make_debug_wrapper("avoid", min_lidar_distance_penalty),
+    #     weight= 2.0,
+    # )
+    # reach = RewTerm(
+    #     func=_make_debug_wrapper("reach", goal_reached_reward),
+    #     weight=50.0,
+    # )
+    # time = RewTerm(
+    #     func=_make_debug_wrapper("time", time_efficiency),
+    #     weight=10.0,
+    # )
+    # steer = RewTerm(
+    #     func=_make_debug_wrapper("steer", high_angular_velocity),
+    #     weight= 5.0,
+    # )
 
 
 
