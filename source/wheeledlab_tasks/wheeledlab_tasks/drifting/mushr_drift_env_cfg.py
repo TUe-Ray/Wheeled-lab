@@ -488,6 +488,29 @@ def sustained_small_turn_reward(env, window_s: float = 0.5):
 
     return out
 
+def sustained_smaller_turn_reward(env, window_s: float = 0.1):
+    global _turn_buffers
+    # compute how many sim‐steps fit in window_s
+    dt = env.cfg.sim.dt * env.cfg.decimation
+    window_steps = max(1, int(window_s / dt))
+    N = env.num_envs
+
+    # lazy‐init one deque per env
+    if _turn_buffers is None:
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+
+    out = torch.zeros(N, device=env.device)
+    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
+
+    for i in range(N):
+        _turn_buffers[i].append(float(w[i].cpu()))
+        if len(_turn_buffers[i]) == window_steps:
+            avg_w = sum(_turn_buffers[i]) / window_steps
+            if abs(avg_w) > 0.1:  # reward only sustained “big” turns
+                out[i] = abs(avg_w)
+
+    return out
+
 
 
 @configclass
@@ -541,7 +564,12 @@ class TraverseABCfg:
 
     sustained_small_turn = RewTerm(
         func=sustained_small_turn_reward,
-        weight= 94,
+        weight= 40,
+    )
+
+    sustained_smaller_turn = RewTerm(
+        func=sustained_smaller_turn_reward,
+        weight= 10,
     )
 
 ########################
@@ -654,8 +682,8 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.lookat = [0.0, 0.0, 0.]
 
         self.sim.dt = 0.005  # 200 Hz
-        self.decimation = 100  # 50 Hz
-        self.sim.render_interval = 100 # 10 Hz
+        self.decimation = 4  # 50 Hz
+        self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 10
         self.actions.throttle.scale = (MAX_SPEED, 6)
 
