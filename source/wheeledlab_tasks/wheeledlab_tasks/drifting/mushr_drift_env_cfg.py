@@ -515,7 +515,7 @@ def sustained_smaller_turn_reward(env, window_s: float = 0.05):
         _turn_buffers[i].append(float(w[i].cpu()))
         if len(_turn_buffers[i]) == window_steps:
             avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.05:  # reward only sustained “big” turns
+            if abs(avg_w) > 0.01:  # reward only sustained “big” turns
                 out[i] = abs(avg_w)
 
     return out
@@ -542,10 +542,10 @@ class TraverseABCfg:
         func=mdp.rewards.is_alive,
         weight=1.0,
     )
-    move_signed = RewTerm(
-        func=signed_velocity_toward_goal,
-        weight=10.0,       # scale this up or down as you see fit
-    )
+    # move_signed = RewTerm(
+    #     func=signed_velocity_toward_goal,
+    #     weight=10.0,       # scale this up or down as you see fit
+    # )
 
 
     # timeout_penalty = RewTerm(
