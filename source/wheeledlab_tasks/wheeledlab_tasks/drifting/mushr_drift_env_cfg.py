@@ -305,7 +305,7 @@ def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
 def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=10):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    print("Move towards goal", torch.exp(-dist / scale))
+    #print("Move towards goal", torch.exp(-dist / scale))
     return torch.exp(-dist / scale)
 
 def lidar_obstacle_penalty(env, min_dist=0.3):
@@ -317,7 +317,7 @@ def lidar_obstacle_penalty(env, min_dist=0.3):
     robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
     dist = torch.norm(hits[..., :2] - robot_pos, dim=-1)  # B x rays
     close_hits = (dist < min_dist).float()
-    print("Lidar obstacle penalty", -close_hits.sum(dim=-1))
+    #print("Lidar obstacle penalty", -close_hits.sum(dim=-1))
     return -close_hits.sum(dim=-1)
 
 def low_speed_penalty(env, low_speed_thresh: float=0.3):
@@ -326,7 +326,7 @@ def low_speed_penalty(env, low_speed_thresh: float=0.3):
     return pen
 
 def forward_vel(env):
-    print("forward_vel", mdp.base_lin_vel(env)[:, 0])
+    #print("forward_vel", mdp.base_lin_vel(env)[:, 0])
     return mdp.base_lin_vel(env)[:, 0]
 
 def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
@@ -336,7 +336,7 @@ def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
     vel_norm = torch.nn.functional.normalize(vel, dim=-1)
     dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
-    print("Goal direction alignment", dot)
+    #print("Goal direction alignment", dot)
     return dot  # +1 when aligned, -1 when opposite
 
 def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
@@ -355,20 +355,20 @@ def min_lidar_distance_penalty(env, threshold=0.5):
     robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
     dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
     min_dist = torch.min(dists, dim=-1)[0]  # B
-    print("Lidar distance", torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist)))
+    #print("Lidar distance", torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist)))
     return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
 
 
 
 def high_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
-    print("Angular velocity:",  torch.abs(ang_vel[..., 2])  )
+    #print("Angular velocity:",  torch.abs(ang_vel[..., 2])  )
     return torch.abs(ang_vel[..., 2])  
 
 def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
+    #print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
     return torch.where(dist < threshold, 10.0, 0.0)
 
 def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
@@ -376,7 +376,7 @@ def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     vel  = mdp.base_lin_vel(env)[..., :2]  # (B,2)
     to_g = goal.to(env.device) - pos       # (B,2)
     to_g = torch.nn.functional.normalize(to_g, dim=-1)
-    print("Velocity_towards_goal",  (vel * to_g).sum(dim=-1))
+    #print("Velocity_towards_goal",  (vel * to_g).sum(dim=-1))
     return (vel * to_g).sum(dim=-1)         # positive when you move toward the goal
 
 def step_progress(env, goal=torch.tensor([5.0,5.0])):
@@ -388,7 +388,7 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     else:
         prog = _prev_dist - dist
     _prev_dist = dist.clone()
-    print("Progress:" , prog)
+    #print("Progress:" , prog)
     return prog
 
 
@@ -399,11 +399,11 @@ class TraverseABCfg:
         weight=20.0,
     )
 
-    obstacle_avoidance = RewTerm(
-        func=lidar_obstacle_penalty,
-        weight=1.0,
-        params={"min_dist": 0.3},
-    )
+    # #obstacle_avoidance = RewTerm(
+    #     func=lidar_obstacle_penalty,
+    #     weight=1.0,
+    #     params={"min_dist": 0.3},
+    # )
     step_progress = RewTerm(
         func=step_progress,
         weight=.0,
@@ -432,10 +432,10 @@ class TraverseABCfg:
        weight = 1,
     )
     align = RewTerm(func=goal_direction_alignment, weight=5.0)
-    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
-    steer = RewTerm(func=high_angular_velocity, weight=50)
+    steer = RewTerm(func=high_angular_velocity, weight=1000)
 
 
 ########################
@@ -449,9 +449,9 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "steer",
-            "increase": -8.0,
+            "increase": -99,
             "episodes_per_increase": 20,
-            "max_increases": 5,
+            "max_increases": 10,
         },
     )
     # Every 20 eps increase the progress reward by 2, up to 10 times (1→21)
