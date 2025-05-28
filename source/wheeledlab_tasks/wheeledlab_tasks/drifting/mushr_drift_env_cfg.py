@@ -140,8 +140,8 @@ class DriftEventsCfg:
 #        },
 #        mode="reset",
 #    )
-    reset_progress_tracker: EventTermCfg = None
-    step_progress_tracker:  EventTermCfg = None
+    reset_progress_tracker: EventTerm = None
+    step_progress_tracker:  EventTerm = None
 
     reset_progress = EventTerm(
         func=reset_progress_tracker,
