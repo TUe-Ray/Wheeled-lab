@@ -43,6 +43,46 @@ def reset_progress_tracker(env, env_ids):
     return None   # EventTerms always expect a return, even if you don’t use it
 
 
+from collections import deque
+
+# will hold one deque per env
+_turn_buffers: list[deque] | None = None
+
+def sustained_turn_reward(env, env_ids=None, window_s=1.0):
+    global _turn_buffers
+
+    # time per control step
+    dt = env.cfg.sim.dt * env.decimation
+    window_steps = max(1, int(window_s / dt))
+    N = env.num_envs
+
+    # init buffers
+    if _turn_buffers is None:
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+
+    # when Isaac calls mode="reset", it passes env_ids=some mask: clear those
+    if env_ids is not None:
+        # env_ids might be a slice, list, or tensor; normalize to list of ints
+        ids = list(env_ids) if isinstance(env_ids, (list, tuple)) else range(N) if env_ids is slice(None) else env_ids.tolist()
+        for i in ids:
+            _turn_buffers[i].clear()
+        # return zeros so reset doesn’t contribute any reward
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # normal step: compute per-env yaw rate
+    w = mdp.base_ang_vel(env)[..., 2].detach().cpu().tolist()  # list of floats
+    out = torch.zeros(N, device=env.device)
+
+    # update buffers and compute bonus
+    for i in range(N):
+        _turn_buffers[i].append(w[i])
+        if len(_turn_buffers[i]) == window_steps:
+            avg_w = sum(_turn_buffers[i]) / window_steps
+            # only reward if sustained above threshold
+            if abs(avg_w) > 0.3:
+                out[i] = abs(avg_w)
+    return out
+
 
 ###################
 ###### SCENE ######
@@ -394,46 +434,6 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     _prev_dist = dist.clone()
     #print("Progress:" , prog)
     return prog
-
-from collections import deque
-
-# will hold one deque per env
-_turn_buffers: list[deque] | None = None
-
-def sustained_turn_reward(env, env_ids=None, window_s=1.0):
-    global _turn_buffers
-
-    # time per control step
-    dt = env.cfg.sim.dt * env.decimation
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # init buffers
-    if _turn_buffers is None:
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-
-    # when Isaac calls mode="reset", it passes env_ids=some mask: clear those
-    if env_ids is not None:
-        # env_ids might be a slice, list, or tensor; normalize to list of ints
-        ids = list(env_ids) if isinstance(env_ids, (list, tuple)) else range(N) if env_ids is slice(None) else env_ids.tolist()
-        for i in ids:
-            _turn_buffers[i].clear()
-        # return zeros so reset doesn’t contribute any reward
-        return torch.zeros(env.num_envs, device=env.device)
-
-    # normal step: compute per-env yaw rate
-    w = mdp.base_ang_vel(env)[..., 2].detach().cpu().tolist()  # list of floats
-    out = torch.zeros(N, device=env.device)
-
-    # update buffers and compute bonus
-    for i in range(N):
-        _turn_buffers[i].append(w[i])
-        if len(_turn_buffers[i]) == window_steps:
-            avg_w = sum(_turn_buffers[i]) / window_steps
-            # only reward if sustained above threshold
-            if abs(avg_w) > 0.3:
-                out[i] = abs(avg_w)
-    return out
 
 
 @configclass
