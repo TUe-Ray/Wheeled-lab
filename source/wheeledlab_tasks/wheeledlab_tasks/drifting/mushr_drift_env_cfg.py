@@ -59,7 +59,14 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     terrain = DriftTerrainImporterCfg()
     #robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
+    goal_marker = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/GoalMarker",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[5.0, 5.0, 0.0]),
+        spawn=SphereCfg(
+            radius=0.2,
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
+        ),
+    )
     # lights
     light = AssetBaseCfg(
         prim_path="/World/light",
@@ -335,7 +342,7 @@ def smooth_velocity_change(env):
     delta = vel - env.prev_vel  # requires env.prev_vel to be tracked manually
     return -torch.norm(delta, dim=-1)
 
-def low_angular_velocity(env):
+def high_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
     return torch.abs(ang_vel[..., 2])  # Penalize yaw
 
@@ -347,10 +354,10 @@ def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
 
 @configclass
 class TraverseABCfg:
-    goal_progress = RewTerm(
-        func=move_towards_goal,
-        weight=20.0,
-    )
+    # goal_progress = RewTerm(
+    #     func=move_towards_goal,
+    #     weight=20.0,
+    # )
 
     # obstacle_avoidance = RewTerm(
     #     func=lidar_obstacle_penalty,
@@ -358,10 +365,10 @@ class TraverseABCfg:
     #     params={"min_dist": 0.3},
     # )
 
-    alive = RewTerm(
-        func=mdp.rewards.is_alive,
-        weight=1.0,
-    )
+    # alive = RewTerm(
+    #     func=mdp.rewards.is_alive,
+    #     weight=1.0,
+    # )
 
     # timeout_penalty = RewTerm(
     #     func=mdp.rewards.is_terminated,
@@ -381,7 +388,7 @@ class TraverseABCfg:
     #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     #reach = RewTerm(func=goal_reached_reward, weight=50.0)
     #time = RewTerm(func=time_efficiency, weight=10.0)
-    stable = RewTerm(func=low_angular_velocity, weight=5.0)
+    stable = RewTerm(func=high_angular_velocity, weight=5.0)
 
 
 ########################
