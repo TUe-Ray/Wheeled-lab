@@ -155,6 +155,10 @@ class DriftEventsCfg:
         },
         mode="reset",
     )
+    report_terms = EventTerm(  # or any “reset” event
+    func=sustained_turn_reward,
+    mode="reset",
+)
 
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
@@ -391,6 +395,46 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     #print("Progress:" , prog)
     return prog
 
+from collections import deque
+
+# will hold one deque per env
+_turn_buffers: list[deque] | None = None
+
+def sustained_turn_reward(env, env_ids=None, window_s=1.0):
+    global _turn_buffers
+
+    # time per control step
+    dt = env.cfg.sim.dt * env.decimation
+    window_steps = max(1, int(window_s / dt))
+    N = env.num_envs
+
+    # init buffers
+    if _turn_buffers is None:
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+
+    # when Isaac calls mode="reset", it passes env_ids=some mask: clear those
+    if env_ids is not None:
+        # env_ids might be a slice, list, or tensor; normalize to list of ints
+        ids = list(env_ids) if isinstance(env_ids, (list, tuple)) else range(N) if env_ids is slice(None) else env_ids.tolist()
+        for i in ids:
+            _turn_buffers[i].clear()
+        # return zeros so reset doesn’t contribute any reward
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # normal step: compute per-env yaw rate
+    w = mdp.base_ang_vel(env)[..., 2].detach().cpu().tolist()  # list of floats
+    out = torch.zeros(N, device=env.device)
+
+    # update buffers and compute bonus
+    for i in range(N):
+        _turn_buffers[i].append(w[i])
+        if len(_turn_buffers[i]) == window_steps:
+            avg_w = sum(_turn_buffers[i]) / window_steps
+            # only reward if sustained above threshold
+            if abs(avg_w) > 0.3:
+                out[i] = abs(avg_w)
+    return out
+
 
 @configclass
 class TraverseABCfg:
@@ -435,7 +479,10 @@ class TraverseABCfg:
     #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
-    steer = RewTerm(func=high_angular_velocity, weight=1000)
+    sustained_turn = RewTerm(
+        func=sustained_turn_reward,
+        weight= 94,
+    )
 
 
 ########################
@@ -448,8 +495,8 @@ class DriftCurriculumCfg:
     decay_align = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "steer",
-            "increase": -99,
+            "reward_term_name": "sustained_turn",
+            "increase": -9,
             "episodes_per_increase": 20,
             "max_increases": 10,
         },
