@@ -45,45 +45,45 @@ def reset_progress_tracker(env, env_ids):
 
 from collections import deque
 
-# will hold one deque per env
-_turn_buffers: list[deque] | None = None
 
-def sustained_turn_reward(env, env_ids=None, window_s=1.0):
+_turn_buffers = None
+
+def sustained_turn_reward(env, env_ids=None, window_s: float = 1.0):
     global _turn_buffers
 
-    # time per control step
+    # how many steps correspond to our window of time
     dt = env.cfg.sim.dt * env.decimation
     window_steps = max(1, int(window_s / dt))
     N = env.num_envs
 
-    # init buffers
+    # initialize once
     if _turn_buffers is None:
         _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
 
-    # when Isaac calls mode="reset", it passes env_ids=some mask: clear those
+    # — RESET callback — clear only those envs
     if env_ids is not None:
-        # env_ids might be a slice, list, or tensor; normalize to list of ints
-        ids = list(env_ids) if isinstance(env_ids, (list, tuple)) else range(N) if env_ids is slice(None) else env_ids.tolist()
+        # normalize env_ids to a list of ints
+        if isinstance(env_ids, slice):
+            ids = list(range(N))
+        elif hasattr(env_ids, "tolist"):
+            ids = env_ids.tolist()
+        else:
+            ids = list(env_ids)
         for i in ids:
             _turn_buffers[i].clear()
-        # return zeros so reset doesn’t contribute any reward
-        return torch.zeros(env.num_envs, device=env.device)
+        # must return a tensor of zeros, but IsaacLab will ignore it
+        return torch.zeros(N, device=env.device)
 
-    # normal step: compute per-env yaw rate
-    w = mdp.base_ang_vel(env)[..., 2].detach().cpu().tolist()  # list of floats
+    # — STEP callback — update buffers & compute reward
     out = torch.zeros(N, device=env.device)
-
-    # update buffers and compute bonus
+    w = mdp.base_ang_vel(env)[..., 2]  # (N,) yaw rates
     for i in range(N):
-        _turn_buffers[i].append(w[i])
+        _turn_buffers[i].append(float(w[i].cpu()))
         if len(_turn_buffers[i]) == window_steps:
             avg_w = sum(_turn_buffers[i]) / window_steps
-            # only reward if sustained above threshold
             if abs(avg_w) > 0.3:
                 out[i] = abs(avg_w)
     return out
-
-
 ###################
 ###### SCENE ######
 ###################
