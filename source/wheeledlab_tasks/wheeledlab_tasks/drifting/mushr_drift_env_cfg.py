@@ -43,23 +43,24 @@ def reset_progress_tracker(env, env_ids):
     _prev_dist = None
     return None   # EventTerms always expect a return, even if you don’t use it
 
+
+
 _term_buffers = defaultdict(list)
 
 def _make_debug_wrapper(term_name, func):
-    """Returns a wrapped version of your term func that logs its batch-mean each step."""
-    def _wrapped(env, **params):
-        vals = func(env, **params)               # original per-env vector, shape (B,)
-        m = float(vals.mean().cpu())             # scalar mean across envs
-        _term_buffers[term_name].append(m)       # stash it
-        return vals                              # return original vector so IsaacLab can sum it
-    return _wrapped
+    def wrapped(env, **params):
+        vals = func(env, **params)
+        _term_buffers[term_name].append(float(vals.mean().cpu()))
+        return vals
+    # expose a stable name on the module
+    wrapped.__name__ = f"wrapped_{term_name}"
+    return wrapped
 
 def _reset_and_report(env):
-    """EventTerm (mode=reset) that prints & clears all buffers at episode boundary."""
     if _term_buffers:
         print("⎡ Episode term-means ⎤")
         for name, buf in _term_buffers.items():
-            print(f" {name:20s} → {np.mean(buf):.4f}")
+            print(f" {name:20s}→ {np.mean(buf):.4f}")
         print("⎣" + "─"*30 + "⎦")
         _term_buffers.clear()
     return None
