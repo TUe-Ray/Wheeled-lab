@@ -80,7 +80,7 @@ class OriginActionCfg:
         wheel_radius=0.12,
         wheel_base=0.5,        # Distance between left and right wheels
         # command_type="velocity",  # or "effort", depending on how your URDF/SDF is set up
-        scale=(1.0, 10.0),         # Max linear and angular velocity (optional)
+        scale=(1.0, 5.0),         # Max linear and angular velocity (optional)
         bounding_strategy="clip",
         no_reverse=False,
         asset_name="robot",

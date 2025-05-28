@@ -33,7 +33,7 @@ CORNER_OUT_RADIUS = 2.0       # For termination
 LINE_RADIUS = 0.8             # For spawning and reward
 STRAIGHT = 0.8                # Shaping
 SLIP_THRESHOLD = 0.55         # (rad) For reward
-MAX_SPEED = 1.0               # (m/s) For action and reward
+MAX_SPEED = 1.5               # (m/s) For action and reward
 
 ###################
 ###### SCENE ######
@@ -134,7 +134,7 @@ class DriftEventsCfg:
         func=reset_root_state_new,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-4, 0, 0.0],
+            "pos": [4, 0, 0.0],
             "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",
@@ -385,8 +385,8 @@ class TraverseABCfg:
 
     obstacle_avoidance = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=10.0,
-        params={"min_dist": 0.5},
+        weight=20.0,
+        params={"min_dist": 1.0},
     )
 
     alive = RewTerm(
@@ -412,7 +412,7 @@ class TraverseABCfg:
     align = RewTerm(
         func=goal_direction_alignment,
         weight=5.0,
-        params={"goal": [4.0, 0.0]},
+        params={"goal": [-4.0, 0.0]},
     )
     avoid = RewTerm(func=min_lidar_distance_penalty, weight=3.0)
 #    reach = RewTerm(func=goal_reached_reward, weight=50.0)
@@ -420,7 +420,7 @@ class TraverseABCfg:
         func=goal_reached_reward,
         weight=50.0,
         params={
-            "goal": [4.0, 0.0],
+            "goal": [-4.0, 0.0],
             "threshold": 0.3,
         },
     )
@@ -429,7 +429,7 @@ class TraverseABCfg:
         func=time_efficiency,
         weight=10.0,
         params={
-            "goal": [4.0, 0.0],
+            "goal": [-4.0, 0.0],
             "reached_thresh": 0.3,
         },
     )
