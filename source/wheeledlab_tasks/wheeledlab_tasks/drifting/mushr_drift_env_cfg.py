@@ -342,6 +342,12 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([5.0, 5.0])):
 #    b) Distance penalty (scaled distance from goal)
 # ────────────────────────────────────────────────────────────────────────────
 
+def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
+    pos = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    #print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
+    return torch.where(dist < threshold, 10.0, 0.0)
+
 def away_movement_penalty(env, goal=torch.tensor([5.0, 5.0])):
     # clamp negative projections, zero otherwise
     proj = signed_velocity_toward_goal(env, goal=goal)
