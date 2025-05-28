@@ -22,7 +22,7 @@ from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerAct
 from wheeledlab_assets import OriginRobotCfg
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from .mdp import reset_root_state_along_track, reset_root_state_new
-
+from functools import partial
 ##############################
 ###### COMMON CONSTANTS ######
 ##############################
@@ -290,296 +290,104 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 ###### REWARDS #######
 ######################
 
-def track_progress_rate(env):
-    '''Estimate track progress by positive z-axis angular velocity around the environment'''
-    asset : RigidObject = env.scene[SceneEntityCfg("robot").name]
-    root_ang_vel = asset.data.root_link_ang_vel_w # this is different than the mdp one
-    progress_rate = root_ang_vel[..., 2]
-    return progress_rate
+_turn_buffers = None
+_buf_params = (None, None)
 
-def vel_dist(env, speed_target: float=MAX_SPEED, offset: float=-MAX_SPEED**2):
-    lin_vel = mdp.base_lin_vel(env)
-    ground_speed = torch.norm(lin_vel[..., :2], dim=-1)
-    speed_dist = (ground_speed - speed_target) ** 2 + offset
-    return speed_dist # speed target
+def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.5):
+    global _turn_buffers, _buf_params
 
-def cross_track_dist(env,
-                    straight: float,
-                    track_radius: float=(CORNER_IN_RADIUS + CORNER_OUT_RADIUS) / 2,
-                    offset: float= -1.,
-                    p: float=1.0):
-    """Measures distance from a given radius on the track. Defaults
-             to the middle of the track."""
-    poses = mdp.root_pos_w(env)
-    on_straights = torch.abs(poses[...,1]) < straight
-    sq_ctd = torch.where(on_straights,
-                torch.where(poses[...,0] > 0, # Straights
-                    (poses[...,0] - track_radius)**2, # Quadrant 1
-                    (poses[...,0] + track_radius)**2), # Quadrant 2
-                torch.where(poses[...,1] > 0, # Corners
-                    (torch.sqrt((poses[...,1] - straight)**2 + poses[...,0]**2) - track_radius)**2, # Positive y Turn
-                    (torch.sqrt((poses[...,1] + straight)**2 + poses[...,0]**2) - track_radius)**2 # Negative y Turn
-                )
-    )
-    ctd = torch.sqrt(sq_ctd) + offset
+    dt = env.cfg.sim.dt * env.cfg.decimation
+    window_steps= window_s
+    N = env.num_envs
 
-    return torch.pow(ctd, p)
+    # re‐initialize if dims or window changed
+    if _turn_buffers is None or _buf_params != (window_steps, N):
+        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
+        _buf_params = (window_steps, N)
 
-def energy_through_turn(env, straight: float):
-    poses = mdp.root_pos_w(env)
-    speed = torch.norm(mdp.base_lin_vel(env), dim=-1)
-    energy_through_turn = torch.where(torch.abs(poses[...,1]) > straight, speed**2, 0.)
-    return energy_through_turn
+    out = torch.zeros(N, device=env.device)
+    w = mdp.base_ang_vel(env)[..., 2]  # yaw‐rate
 
-def in_range(env, straight, corner_in_radius):
-    poses = mdp.root_pos_w(env)
-    penalty = torch.where(torch.abs(poses[...,1]) < straight,
-                torch.where(torch.abs(poses[...,0]) < corner_in_radius, 1, 0),
-                torch.where(poses[...,1] > 0,
-                    torch.where((poses[...,1] - straight)**2 + poses[...,0]**2 < corner_in_radius**2, 1, 0),
-                    torch.where((poses[...,1] + straight)**2 + poses[...,0]**2 < corner_in_radius**2, 1, 0)))
-    return penalty
+    for i in range(N):
+        buf = _turn_buffers[i]
+        buf.append(float(w[i].cpu()))
+        if len(buf) == buf.maxlen:
+            avg_w = sum(buf) / buf.maxlen
+            if abs(avg_w) > tr:
+                out[i] = abs(avg_w)
+    return out
 
-def off_track(env, straight, corner_out_radius):
-    poses = mdp.root_pos_w(env)
-    penalty = torch.where(torch.abs(poses[...,1]) < straight,
-                torch.where(torch.abs(poses[...,0]) > corner_out_radius, 1, 0),
-                torch.where(poses[...,1] > 0,
-                    torch.where((poses[...,1] - straight)**2 + poses[...,0]**2 > corner_out_radius**2, 1, 0),
-                    torch.where((poses[...,1] + straight)**2 + poses[...,0]**2 > corner_out_radius**2, 1, 0)))
-    return penalty
+# ────────────────────────────────────────────────────────────────────────────
+# 2) REWARD FOR MOVING TOWARD GOAL
+#    (signed projection: + when toward, – when away)
+# ────────────────────────────────────────────────────────────────────────────
 
-def side_slip(env, min_thresh: float, max_thresh: float, min_vel_x: float=0.5):
-    vel = mdp.base_lin_vel(env)
-    slip_angle = torch.abs(torch.atan2(vel[...,1], vel[...,0]))
-    valid_angle = torch.where(torch.logical_or(
-        torch.abs(vel[..., 0]) < min_vel_x, slip_angle > max_thresh),
-        0.0, slip_angle
-    )
-    # Discount lateral vel from steering
-    valid_angle = torch.where(valid_angle < min_thresh, 0.0, valid_angle)
-    # Clamp unstable angles. Harder than zeroing for heavy, unstable vehicles
-    # valid_angle = torch.clamp(valid_angle, max=max_thresh)
-    return valid_angle
+def signed_velocity_toward_goal(env, goal=torch.tensor([5.0, 5.0])):
+    pos = mdp.root_pos_w(env)[..., :2]       # (B,2)
+    vel = mdp.base_lin_vel(env)[..., :2]     # (B,2)
 
-def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
-    asset = env.scene[SceneEntityCfg("robot").name]
-    steer_joints = asset.find_joints(".*_steer")[0]
-    steer_joint_pos = mdp.joint_pos(env)[..., steer_joints].mean(dim=-1)
-    ang_vel = mdp.base_ang_vel(env)[..., 2]
-    ang_vel = torch.clamp(ang_vel, max=ang_vel_thresh, min=-ang_vel_thresh)
-    tlgr = steer_joint_pos * ang_vel * -1.
-    rew = torch.clamp(tlgr, min=0.)
-    return rew
-
-def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=10):
-    pos = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    #print("Move towards goal", torch.exp(-dist / scale))
-    return torch.exp(-dist / scale)
-
-def lidar_obstacle_penalty(env, min_dist=0.3):
-    """
-    Penalize if obstacle is closer than min_dist in front of robot.
-    """
-    lidar: RayCaster = env.scene.sensors["ray_caster"]
-    hits = lidar.data.ray_hits_w  # (B x rays x 3)
-    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
-    dist = torch.norm(hits[..., :2] - robot_pos, dim=-1)  # B x rays
-    close_hits = (dist < min_dist).float()
-    #print("Lidar obstacle penalty", -close_hits.sum(dim=-1))
-    return -close_hits.sum(dim=-1)
-
-def low_speed_penalty(env, low_speed_thresh: float=0.3):
-    lin_speed = torch.norm(mdp.base_lin_vel(env), dim=-1)
-    pen = torch.where(lin_speed < low_speed_thresh, 1., 0.)
-    return pen
-
-def forward_vel(env):
-    #print("forward_vel", mdp.base_lin_vel(env)[:, 0])
-    return mdp.base_lin_vel(env)[:, 0]
-
-def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
-    pos = mdp.root_pos_w(env)[..., :2]  # B x 2
-    vel = mdp.base_lin_vel(env)[..., :2]  # B x 2
-    to_goal = goal.to(env.device) - pos  # B x 2
+    to_goal = goal.to(env.device) - pos
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
-    vel_norm = torch.nn.functional.normalize(vel, dim=-1)
-    dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
-    #print("Goal direction alignment", dot)
-    return dot  # +1 when aligned, -1 when opposite
 
-def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
-    # current step number (scalar)
-    step = max(int(env.common_step_counter), 1)
-    pos = mdp.root_pos_w(env)[..., :2]
-    dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
-    reached = dist_to_goal < reached_thresh
-    # constant scalar divisor broadcasts to (B,)
-    return reached.float() / float(step)
+    speed = torch.norm(vel, dim=-1)
+    vel_norm = torch.nn.functional.normalize(vel + 1e-6, dim=-1)
+    cosine = (vel_norm * to_goal_norm).sum(dim=-1)
 
+    # positive if toward, negative if away
+    return speed * cosine
 
-def min_lidar_distance_penalty(env, threshold=0.5):
-    lidar: RayCaster = env.scene.sensors["ray_caster"]
-    hits = lidar.data.ray_hits_w  # (B x rays x 3)
-    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
-    dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
-    min_dist = torch.min(dists, dim=-1)[0]  # B
-    #print("Lidar distance", torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist)))
-    return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
+# ────────────────────────────────────────────────────────────────────────────
+# 3) PENALTY FOR MOVING AWAY OR STANDING STILL FAR FROM GOAL
+#    a) Away‐movement penalty (only when projection < 0)
+#    b) Distance penalty (scaled distance from goal)
+# ────────────────────────────────────────────────────────────────────────────
 
+def away_movement_penalty(env, goal=torch.tensor([5.0, 5.0])):
+    # clamp negative projections, zero otherwise
+    proj = signed_velocity_toward_goal(env, goal=goal)
+    return torch.clamp(-proj, min=0.0)
 
-
-def high_angular_velocity(env):
-    ang_vel = mdp.base_ang_vel(env)
-    #print("Angular velocity:",  torch.abs(ang_vel[..., 2])  )
-    return torch.abs(ang_vel[..., 2])  
-
-def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
+def distance_penalty(env, goal=torch.tensor([5.0, 5.0])):
+    # straight‐line distance, penalize being far
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    #print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
-    return torch.where(dist < threshold, 10.0, 0.0)
-
-def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
-    pos  = mdp.root_pos_w(env)[..., :2]
-    vel  = mdp.base_lin_vel(env)[..., :2]
-    to_g = goal.to(env.device) - pos
-    to_g = torch.nn.functional.normalize(to_g, dim=-1)
-    raw = (vel * to_g).sum(dim=-1)
-    return torch.relu(raw)
-
-
-
-def sustained_turn_reward(env, window_s: float = 1.0):
-    global _turn_buffers
-    # compute how many sim‐steps fit in window_s
-    dt = env.cfg.sim.dt * env.cfg.decimation
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # lazy‐init one deque per env
-    if _turn_buffers is None:
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-
-    out = torch.zeros(N, device=env.device)
-    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
-
-    for i in range(N):
-        _turn_buffers[i].append(float(w[i].cpu()))
-        if len(_turn_buffers[i]) == window_steps:
-            avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.3:  # reward only sustained “big” turns
-                out[i] = abs(avg_w)
-
-    return out
-
-def sustained_small_turn_reward(env, window_s: float = 0.5):
-    global _turn_buffers
-    # compute how many sim‐steps fit in window_s
-    dt = env.cfg.sim.dt * env.cfg.decimation
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # lazy‐init one deque per env
-    if _turn_buffers is None:
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-
-    out = torch.zeros(N, device=env.device)
-    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
-
-    for i in range(N):
-        _turn_buffers[i].append(float(w[i].cpu()))
-        if len(_turn_buffers[i]) == window_steps:
-            avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.1:  # reward only sustained “big” turns
-                out[i] = abs(avg_w)
-
-    return out
-
-def sustained_smaller_turn_reward(env, window_s: float = 0.05):
-    global _turn_buffers
-    # compute how many sim‐steps fit in window_s
-    dt = env.cfg.sim.dt * env.cfg.decimation
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # lazy‐init one deque per env
-    if _turn_buffers is None:
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-
-    out = torch.zeros(N, device=env.device)
-    w = mdp.base_ang_vel(env)[..., 2]  # current yaw‐rates, shape (N,)
-
-    for i in range(N):
-        _turn_buffers[i].append(float(w[i].cpu()))
-        if len(_turn_buffers[i]) == window_steps:
-            avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.01:  # reward only sustained “big” turns
-                out[i] = abs(avg_w)
-
-    return out
-
-
+    return -dist
 
 @configclass
 class TraverseABCfg:
 
-    # #obstacle_avoidance = RewTerm(
-    #     func=lidar_obstacle_penalty,
-    #     weight=1.0,
-    #     params={"min_dist": 0.3},
-    # )
-    step_progress = RewTerm(
-        func=step_progress,
-        weight=10,
+   # encourage forward‐progress toward the goal
+    step_toward = RewTerm(
+        func=partial(signed_velocity_toward_goal, goal=torch.tensor([5.0,5.0])),
+        weight=20.0,
     )
-    # forward = RewTerm(
-    #     func=velocity_toward_goal,
-    #     weight=10.0,
-    # )
-    alive = RewTerm(
-        func=mdp.rewards.is_alive,
-        weight=1.0,
+
+    # penalize any movement away
+    away_penalty = RewTerm(
+        func=partial(away_movement_penalty, goal=torch.tensor([5.0,5.0])),
+        weight=30.0,
     )
-    # move_signed = RewTerm(
-    #     func=signed_velocity_toward_goal,
-    #     weight=10.0,       # scale this up or down as you see fit
-    # )
 
+    # penalize simply “parking” far from the goal
+    dist_penalty = RewTerm(
+        func=partial(distance_penalty, goal=torch.tensor([5.0,5.0])),
+        weight=10.0,
+    )
 
-    # timeout_penalty = RewTerm(
-    #     func=mdp.rewards.is_terminated,
-    #     weight=-50.0,
-    # )
-
-    # low_speed_penalty = RewTerm(
-    #     func = low_speed_penalty,
-    #     weight = 1
-    # )
-
-    #forward_vel = RewTerm(
-    #   func = forward_vel,
-    #   weight = 1,
-    #)
-    #align = RewTerm(func=goal_direction_alignment, weight=5.0)
-    #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    # keep your alive and reach terms if you want
+    alive = RewTerm(func=mdp.rewards.is_alive, weight=1.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    time = RewTerm(func=time_efficiency, weight=10.0)
+
+    # sustained turns (as before)
     sustained_turn = RewTerm(
-        func=sustained_turn_reward,
-        weight= 94,
+        func=partial(sustained_turn_reward, window_s=1.0, tr=0.5),
+        weight=94.0,
     )
-
     sustained_small_turn = RewTerm(
-        func=sustained_small_turn_reward,
-        weight= 40,
+        func=partial(sustained_turn_reward, window_s=0.5, tr=0.2),
+        weight=40.0,
     )
 
-    sustained_smaller_turn = RewTerm(
-        func=sustained_smaller_turn_reward,
-        weight= 10,
-    )
 
 ########################
 ###### CURRICULUM ######
@@ -606,16 +414,7 @@ class DriftCurriculumCfg:
             "max_increases": 10,
         },
     )
-    # Every 20 eps increase the progress reward by 2, up to 10 times (1→21)
-    grow_progress = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "step_progress",
-            "increase": 2.0,
-            "episodes_per_increase": 20,
-            "max_increases": 10,
-        },
-    )
+
 
 ##########################
 ###### TERMINATION #######
@@ -691,7 +490,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.lookat = [0.0, 0.0, 0.]
 
         self.sim.dt = 0.005  # 200 Hz
-        self.decimation = 4  # 50 Hz
+        self.decimation = 10  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 10
         self.actions.throttle.scale = (MAX_SPEED, 6)
