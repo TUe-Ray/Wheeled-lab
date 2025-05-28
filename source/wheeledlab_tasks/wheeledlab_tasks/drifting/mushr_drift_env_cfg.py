@@ -62,16 +62,25 @@ def clear_turn_buffers(env, env_ids):
     # return a dummy tensor so IsaacLab is happy
     return torch.zeros(env.num_envs, device=env.device)
 
-def signed_velocity_to_goal(env, goal=torch.tensor([5.0, 5.0])):
-    # current positions (B,2) and velocities (B,2)
-    pos = mdp.root_pos_w(env)[..., :2]
-    vel = mdp.base_lin_vel(env)[..., :2]
-    # compute unit “to-goal” vectors
-    to_goal = goal.to(env.device) - pos                   # (B,2)
-    to_goal_norm = torch.nn.functional.normalize(to_goal+0.0001, dim=-1)
-    # dot product: positive if your velocity has a component toward the goal,
-    # negative if it points away
-    return (vel * to_goal_norm).sum(dim=-1)                # (B,)
+def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
+    # 1) world-frame position & velocity
+    pos = mdp.root_pos_w(env)[..., :2]          # (B,2)
+    vel = mdp.base_lin_vel(env)[..., :2]        # (B,2)
+
+    # 2) unit vector pointing from you → goal
+    to_goal = goal.to(env.device) - pos         # (B,2)
+    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
+
+    # 3) forward speed
+    speed = torch.norm(vel, dim=-1)             # (B,)
+
+    # 4) heading alignment (cosine of angle between vel & to_goal)
+    vel_norm = torch.nn.functional.normalize(vel, dim=-1)
+    cosine = (vel_norm * to_goal_norm).sum(dim=-1)  # in [–1,1]
+
+    # 5) return signed‐projection:   speed × cos(θ)
+    #    >0 if moving toward, <0 if moving away
+    return speed * cosine
 
 
 _prev_dists = None
@@ -488,7 +497,7 @@ def sustained_small_turn_reward(env, window_s: float = 0.5):
 
     return out
 
-def sustained_smaller_turn_reward(env, window_s: float = 0.1):
+def sustained_smaller_turn_reward(env, window_s: float = 0.05):
     global _turn_buffers
     # compute how many sim‐steps fit in window_s
     dt = env.cfg.sim.dt * env.cfg.decimation
@@ -506,7 +515,7 @@ def sustained_smaller_turn_reward(env, window_s: float = 0.1):
         _turn_buffers[i].append(float(w[i].cpu()))
         if len(_turn_buffers[i]) == window_steps:
             avg_w = sum(_turn_buffers[i]) / window_steps
-            if abs(avg_w) > 0.1:  # reward only sustained “big” turns
+            if abs(avg_w) > 0.05:  # reward only sustained “big” turns
                 out[i] = abs(avg_w)
 
     return out
@@ -523,7 +532,7 @@ class TraverseABCfg:
     # )
     step_progress = RewTerm(
         func=step_progress,
-        weight=.0,
+        weight=10,
     )
     # forward = RewTerm(
     #     func=velocity_toward_goal,
@@ -534,7 +543,7 @@ class TraverseABCfg:
         weight=1.0,
     )
     move_signed = RewTerm(
-        func=signed_velocity_to_goal,
+        func=signed_velocity_toward_goal,
         weight=10.0,       # scale this up or down as you see fit
     )
 

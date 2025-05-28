@@ -10,7 +10,7 @@ class MushrPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
-        init_noise_std=1.0,
+        init_noise_std=1.5,
         actor_hidden_dims=[64, 64],
         critic_hidden_dims=[64, 64],
         activation="elu",
