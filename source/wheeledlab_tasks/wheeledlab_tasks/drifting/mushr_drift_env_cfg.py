@@ -297,7 +297,7 @@ def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.5):
     global _turn_buffers, _buf_params
 
     dt = env.cfg.sim.dt * env.cfg.decimation
-    window_steps= window_s
+    window_steps= int(window_s)
     N = env.num_envs
 
     # re‐initialize if dims or window changed
