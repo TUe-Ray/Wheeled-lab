@@ -99,7 +99,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             horizontal_res=1.0
         ),
         
-        debug_vis=True,
+        debug_vis=False,
     )
 
 
