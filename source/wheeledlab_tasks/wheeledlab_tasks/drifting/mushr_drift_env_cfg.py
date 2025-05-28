@@ -37,7 +37,7 @@ MAX_SPEED = 3.0               # (m/s) For action and reward
 # somewhere at top‐level of your script
 _prev_dist = None
 
-def reset_progress_tracker(env):
+def reset_progress_tracker(env, env_ids):
     global _prev_dist
     _prev_dist = None
     return None   # EventTerms always expect a return, even if you don’t use it
@@ -140,8 +140,7 @@ class DriftEventsCfg:
 #        },
 #        mode="reset",
 #    )
-    reset_progress_tracker: EventTerm = None
-    step_progress_tracker:  EventTerm = None
+
 
     reset_progress = EventTerm(
         func=reset_progress_tracker,
