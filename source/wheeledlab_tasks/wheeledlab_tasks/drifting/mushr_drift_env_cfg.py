@@ -653,7 +653,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.eye = [10., -10., 10.]
         self.viewer.lookat = [0.0, 0.0, 0.]
 
-        self.sim.dt = 0.005  # 200 Hz
+        self.sim.dt = 0.1  # 200 Hz
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 10

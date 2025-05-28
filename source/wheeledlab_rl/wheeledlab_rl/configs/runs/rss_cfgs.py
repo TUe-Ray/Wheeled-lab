@@ -15,7 +15,7 @@ class RSS_DRIFT_CONFIG(RslRlRunConfig):
         rl_algo_lib="rsl",
         rl_algo_class="ppo",
         log=LogConfig(
-            video_interval=500,
+            video_interval=1500,
             video_length = 600,
         ),
     )
