@@ -212,7 +212,7 @@ class DriftEventsCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "pos": [-2, -3, 0.0],    # ← your desired start-point A
-            "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
+            "rot": [0.0, 0.0, 0.0, 0.0], # no initial yaw
         },
         mode="reset",
     )
@@ -232,7 +232,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
     push_start = EventTerm(
     func=mdp.push_by_setting_velocity,
     mode="reset",
-    params={"velocity_range": {"yaw": (-1.0,1.0)}}
+    params={"velocity_range": {"yaw": (-6.0,6.0)}}
 )
 
     change_wheel_friction = EventTerm(
@@ -276,7 +276,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         mode="startup",
         params={
             "velocity_range":{
-                "yaw": (-1.5, 1.5)
+                "yaw": (-5, 5)
             },
         },
     )
@@ -380,13 +380,13 @@ class TraverseABCfg:
     # penalize any movement away
     away_penalty = RewTerm(
         func=away_movement_penalty,
-        weight=30.0,
+        weight=1000.0,
     )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=10.0,
+        weight=0.001,
     )
 
     # keep your alive and reach terms if you want
@@ -396,12 +396,12 @@ class TraverseABCfg:
     # sustained turns (as before)
     sustained_turn = RewTerm(
         func=sustained_turn_reward,
-        weight=905.0,
+        weight=9005.0,
     )
     instant_turn = RewTerm(
     func=instant_turn_reward,
     params={"scale": 0.05},
-    weight=1.0,
+    weight=1000,
 )
 
 
@@ -416,7 +416,7 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
-            "increase": -90,
+            "increase": -900,
             "episodes_per_increase": 4,
             "max_increases": 10,
         },
