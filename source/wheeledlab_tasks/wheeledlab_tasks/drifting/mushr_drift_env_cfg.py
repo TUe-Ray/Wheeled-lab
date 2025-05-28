@@ -460,21 +460,21 @@ class TraverseABCfg:
         weight=1.0,
     )
 
-    timeout_penalty = RewTerm(
-        func=mdp.rewards.is_terminated,
-        weight=-50.0,
-    )
+    # timeout_penalty = RewTerm(
+    #     func=mdp.rewards.is_terminated,
+    #     weight=-50.0,
+    # )
 
-    low_speed_penalty = RewTerm(
-        func = low_speed_penalty,
-        weight = 1
-    )
+    # low_speed_penalty = RewTerm(
+    #     func = low_speed_penalty,
+    #     weight = 1
+    # )
 
-    forward_vel = RewTerm(
-       func = forward_vel,
-       weight = 1,
-    )
-    align = RewTerm(func=goal_direction_alignment, weight=5.0)
+    #forward_vel = RewTerm(
+    #   func = forward_vel,
+    #   weight = 1,
+    #)
+    #align = RewTerm(func=goal_direction_alignment, weight=5.0)
     #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
     reach = RewTerm(func=goal_reached_reward, weight=50.0)
     time = RewTerm(func=time_efficiency, weight=10.0)
