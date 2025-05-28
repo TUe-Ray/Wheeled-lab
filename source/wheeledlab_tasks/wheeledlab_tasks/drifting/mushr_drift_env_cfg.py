@@ -415,7 +415,7 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
 def sustained_turn_reward(env, window_s: float = 1.0):
     global _turn_buffers
     # compute how many sim‐steps fit in window_s
-    dt = env.cfg.sim.dt * env.decimation
+    dt = env.cfg.sim.dt * env.cfg.decimation
     window_steps = max(1, int(window_s / dt))
     N = env.num_envs
 
