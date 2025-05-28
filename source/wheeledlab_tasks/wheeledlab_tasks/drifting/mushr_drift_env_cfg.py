@@ -1,6 +1,5 @@
 import torch
-from collections import defaultdict
-import numpy as np 
+
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -42,28 +41,6 @@ def reset_progress_tracker(env, env_ids):
     global _prev_dist
     _prev_dist = None
     return None   # EventTerms always expect a return, even if you don’t use it
-
-
-
-_term_buffers = defaultdict(list)
-
-def _make_debug_wrapper(term_name, func):
-    def wrapped(env, **params):
-        vals = func(env, **params)
-        _term_buffers[term_name].append(float(vals.mean().cpu()))
-        return vals
-    # expose a stable name on the module
-    wrapped.__name__ = f"wrapped_{term_name}"
-    return wrapped
-
-def _reset_and_report(env):
-    if _term_buffers:
-        print("⎡ Episode term-means ⎤")
-        for name, buf in _term_buffers.items():
-            print(f" {name:20s}→ {np.mean(buf):.4f}")
-        print("⎣" + "─"*30 + "⎦")
-        _term_buffers.clear()
-    return None
 
 
 
@@ -164,10 +141,7 @@ class DriftEventsCfg:
 #        mode="reset",
 #    )
 
-    report_terms = EventTerm(
-        func=_reset_and_report,
-        mode="reset",
-    )
+
     reset_progress = EventTerm(
         func=reset_progress_tracker,
         mode="reset",
@@ -331,6 +305,7 @@ def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
 def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=10):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    print("Move towards goal", torch.exp(-dist / scale))
     return torch.exp(-dist / scale)
 
 def lidar_obstacle_penalty(env, min_dist=0.3):
@@ -342,6 +317,7 @@ def lidar_obstacle_penalty(env, min_dist=0.3):
     robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
     dist = torch.norm(hits[..., :2] - robot_pos, dim=-1)  # B x rays
     close_hits = (dist < min_dist).float()
+    print("Lidar obstacle penalty", -close_hits.sum(dim=-1))
     return -close_hits.sum(dim=-1)
 
 def low_speed_penalty(env, low_speed_thresh: float=0.3):
@@ -350,6 +326,7 @@ def low_speed_penalty(env, low_speed_thresh: float=0.3):
     return pen
 
 def forward_vel(env):
+    print("forward_vel", mdp.base_lin_vel(env)[:, 0])
     return mdp.base_lin_vel(env)[:, 0]
 
 def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
@@ -359,6 +336,7 @@ def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
     vel_norm = torch.nn.functional.normalize(vel, dim=-1)
     dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
+    print("Goal direction alignment", dot)
     return dot  # +1 when aligned, -1 when opposite
 
 def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
@@ -377,17 +355,20 @@ def min_lidar_distance_penalty(env, threshold=0.5):
     robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
     dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
     min_dist = torch.min(dists, dim=-1)[0]  # B
+    print("Lidar distance", torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist)))
     return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
 
 
 
 def high_angular_velocity(env):
     ang_vel = mdp.base_ang_vel(env)
+    print("Angular velocity:",  torch.abs(ang_vel[..., 2])  )
     return torch.abs(ang_vel[..., 2])  
 
 def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
     return torch.where(dist < threshold, 10.0, 0.0)
 
 def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
@@ -395,6 +376,7 @@ def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     vel  = mdp.base_lin_vel(env)[..., :2]  # (B,2)
     to_g = goal.to(env.device) - pos       # (B,2)
     to_g = torch.nn.functional.normalize(to_g, dim=-1)
+    print("Velocity_towards_goal",  (vel * to_g).sum(dim=-1))
     return (vel * to_g).sum(dim=-1)         # positive when you move toward the goal
 
 def step_progress(env, goal=torch.tensor([5.0,5.0])):
@@ -406,77 +388,54 @@ def step_progress(env, goal=torch.tensor([5.0,5.0])):
     else:
         prog = _prev_dist - dist
     _prev_dist = dist.clone()
+    print("Progress:" , prog)
     return prog
 
-# ─── instantiate your wrappers here (module-level!) ────────────────────────
-wrapped_goal_progress        = _make_debug_wrapper("goal_progress",        move_towards_goal)
-wrapped_obstacle_avoidance   = _make_debug_wrapper("obstacle_avoidance",   lidar_obstacle_penalty)
-wrapped_forward              = _make_debug_wrapper("forward",              velocity_toward_goal)
-wrapped_alive                = _make_debug_wrapper("alive",                mdp.rewards.is_alive)
-wrapped_timeout_penalty      = _make_debug_wrapper("timeout_penalty",      mdp.rewards.is_terminated)
-wrapped_align                = _make_debug_wrapper("align",                goal_direction_alignment)
-wrapped_avoid                = _make_debug_wrapper("avoid",                min_lidar_distance_penalty)
-wrapped_reach                = _make_debug_wrapper("reach",                goal_reached_reward)
-wrapped_time                 = _make_debug_wrapper("time",                 time_efficiency)
-wrapped_steer                = _make_debug_wrapper("steer",                high_angular_velocity)
-
-# ─── now point your configclass at these real callables ────────────────────
 
 @configclass
 class TraverseABCfg:
-    goal_progress       = RewTerm(func=wrapped_goal_progress,      weight=20.0)
-    obstacle_avoidance  = RewTerm(func=wrapped_obstacle_avoidance, weight= 1.0, params={"min_dist":0.3})
-    forward             = RewTerm(func=wrapped_forward,           weight=10.0)
-    alive               = RewTerm(func=wrapped_alive,             weight= 1.0)
-    timeout_penalty     = RewTerm(func=wrapped_timeout_penalty,   weight=-50.0)
-    align               = RewTerm(func=wrapped_align,             weight= 5.0)
-    avoid               = RewTerm(func=wrapped_avoid,             weight= 2.0)
-    reach               = RewTerm(func=wrapped_reach,             weight=50.0)
-    time                = RewTerm(func=wrapped_time,              weight=10.0)
-    steer               = RewTerm(func=wrapped_steer,             weight= 5.0)
+    goal_progress = RewTerm(
+        func=move_towards_goal,
+        weight=20.0,
+    )
 
-    # goal_progress = RewTerm(
-    #     func=_make_debug_wrapper("goal_progress", move_towards_goal),
-    #     weight=20.0,
-    # )
-    # obstacle_avoidance = RewTerm(
-    #     func=_make_debug_wrapper("obstacle_avoidance", lidar_obstacle_penalty),
-    #     weight=1.0,
-    #     params={"min_dist": 0.3},
-    # )
-    # forward = RewTerm(
-    #     func=_make_debug_wrapper("forward", velocity_toward_goal),
-    #     weight=10.0,
-    # )
-    # alive = RewTerm(
-    #     func=_make_debug_wrapper("alive", mdp.rewards.is_alive),
-    #     weight=1.0,
-    # )
-    # timeout_penalty = RewTerm(
-    #     func=_make_debug_wrapper("timeout_penalty", mdp.rewards.is_terminated),
-    #     weight=-50.0,
-    # )
-    # align = RewTerm(
-    #     func=_make_debug_wrapper("align", goal_direction_alignment),
-    #     weight= 5.0,
-    # )
-    # avoid = RewTerm(
-    #     func=_make_debug_wrapper("avoid", min_lidar_distance_penalty),
-    #     weight= 2.0,
-    # )
-    # reach = RewTerm(
-    #     func=_make_debug_wrapper("reach", goal_reached_reward),
-    #     weight=50.0,
-    # )
-    # time = RewTerm(
-    #     func=_make_debug_wrapper("time", time_efficiency),
-    #     weight=10.0,
-    # )
-    # steer = RewTerm(
-    #     func=_make_debug_wrapper("steer", high_angular_velocity),
-    #     weight= 5.0,
-    # )
+    obstacle_avoidance = RewTerm(
+        func=lidar_obstacle_penalty,
+        weight=1.0,
+        params={"min_dist": 0.3},
+    )
+    step_progress = RewTerm(
+        func=step_progress,
+        weight=.0,
+    )
+    forward = RewTerm(
+        func=velocity_toward_goal,
+        weight=10.0,
+    )
+    alive = RewTerm(
+        func=mdp.rewards.is_alive,
+        weight=1.0,
+    )
 
+    timeout_penalty = RewTerm(
+        func=mdp.rewards.is_terminated,
+        weight=-50.0,
+    )
+
+    low_speed_penalty = RewTerm(
+        func = low_speed_penalty,
+        weight = 1
+    )
+
+    forward_vel = RewTerm(
+       func = forward_vel,
+       weight = 1,
+    )
+    align = RewTerm(func=goal_direction_alignment, weight=5.0)
+    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    time = RewTerm(func=time_efficiency, weight=10.0)
+    steer = RewTerm(func=high_angular_velocity, weight=50)
 
 
 ########################
