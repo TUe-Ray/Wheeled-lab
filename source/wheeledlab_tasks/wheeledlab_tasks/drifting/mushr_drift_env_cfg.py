@@ -352,44 +352,53 @@ def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     return torch.where(dist < threshold, 10.0, 0.0)
 
+def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
+    pos  = mdp.root_pos_w(env)[..., :2]    # (B,2)
+    vel  = mdp.base_lin_vel(env)[..., :2]  # (B,2)
+    to_g = goal.to(env.device) - pos       # (B,2)
+    to_g = torch.nn.functional.normalize(to_g, dim=-1)
+    return (vel * to_g).sum(dim=-1)         # positive when you move toward the goal
 
 @configclass
 class TraverseABCfg:
-    # goal_progress = RewTerm(
-    #     func=move_towards_goal,
-    #     weight=20.0,
-    # )
+    goal_progress = RewTerm(
+        func=move_towards_goal,
+        weight=20.0,
+    )
 
-    # obstacle_avoidance = RewTerm(
-    #     func=lidar_obstacle_penalty,
-    #     weight=1.0,
-    #     params={"min_dist": 0.3},
-    # )
+    obstacle_avoidance = RewTerm(
+        func=lidar_obstacle_penalty,
+        weight=1.0,
+        params={"min_dist": 0.3},
+    )
+    forward = RewTerm(
+        func=velocity_toward_goal,
+        weight=10.0,
+    )
+    alive = RewTerm(
+        func=mdp.rewards.is_alive,
+        weight=1.0,
+    )
 
-    # alive = RewTerm(
-    #     func=mdp.rewards.is_alive,
-    #     weight=1.0,
-    # )
-
-    # timeout_penalty = RewTerm(
-    #     func=mdp.rewards.is_terminated,
-    #     weight=-50.0,
-    # )
+    timeout_penalty = RewTerm(
+        func=mdp.rewards.is_terminated,
+        weight=-50.0,
+    )
 
     # low_speed_penalty = RewTerm(
     #     func = low_speed_penalty,
     #     weight = 1
     # )
 
-    #forward_vel = RewTerm(
+    # forward_vel = RewTerm(
     #    func = forward_vel,
     #    weight = 1,
-    #)
-    #align = RewTerm(func=goal_direction_alignment, weight=-5.0)
-    #avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
-    #reach = RewTerm(func=goal_reached_reward, weight=50.0)
-    #time = RewTerm(func=time_efficiency, weight=10.0)
-    stable = RewTerm(func=high_angular_velocity, weight=5.0)
+    # )
+    align = RewTerm(func=goal_direction_alignment, weight=-5.0)
+    avoid = RewTerm(func=min_lidar_distance_penalty, weight=2.0)
+    reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    time = RewTerm(func=time_efficiency, weight=10.0)
+    steer = RewTerm(func=high_angular_velocity, weight=5.0)
 
 
 ########################

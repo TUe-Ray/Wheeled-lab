@@ -14,6 +14,26 @@ from isaaclab.utils.noise import (
 
 from wheeledlab.envs.mdp import root_euler_xyz
 
+MAX_SPEED = 3.0
+
+def wheel_encoder(env, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
+    """
+    Returns a tensor of shape (N_envs, 2): [v_left, v_right] [m/s]
+    simply reading the joint velocities of the left & right wheels.
+    """
+    robot = env.scene[asset_cfg.name]               # Articulation
+    # find the same joint indices you used in your action term:
+    left_ids, _  = robot.find_joints(["front_left_wheel_joint", "rear_left_wheel_joint"])
+    right_ids, _ = robot.find_joints(["front_right_wheel_joint", "rear_right_wheel_joint"])
+    # joint_vel is (N_envs, n_joints)
+    joint_vel = robot.data.joint_vel               # rad/s
+    # convert from rad/s → m/s: v = ω * r
+    r = 0.05  # wheel radius in your SkidSteerActionCfg
+    v_left  = joint_vel[:, left_ids].mean(dim=-1) * r
+    v_right = joint_vel[:, right_ids].mean(dim=-1) * r
+    return torch.stack([v_left, v_right], dim=-1)
+
+
 def lidar_distances(env, sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster")):
     """回傳 RayCaster 與 hit 點之間的距離 (m)。輸出 shape = (N_env, N_rays)."""
     sensor = env.scene[sensor_cfg.name]           # RayCaster 物件
@@ -58,11 +78,16 @@ class BlindObsCfg:
 
         )
 
-        # last_action_term = ObsTerm( # [m/s, (-1, 1)]
-        #     func=mdp.last_action,
-        #     clip=(-1., 1.), # TODO: get from ClipAction wrapper or action space
-        # )
+        last_action_term = ObsTerm( # [m/s, (-1, 1)]
+            func=mdp.last_action,
+            clip=(-1., 1.), # TODO: get from ClipAction wrapper or action space
+        )
 
+        wheel_odom = ObsTerm(
+            func=wheel_encoder,
+            noise=Gnoise(std=0.01),
+            clip=(-MAX_SPEED, MAX_SPEED),
+        )
         def __post_init__(self):
             self.concatenate_terms = True
             self.enable_corruption = False
