@@ -273,8 +273,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 
     push_robots_lf = EventTerm( # Low frequency large pushes
         func=mdp.push_by_setting_velocity,
-        mode="reset",
-        interval_range_s=(0.8, 1.2),
+        mode="startup",
         params={
             "velocity_range":{
                 "yaw": (-1.5, 1.5)
@@ -299,7 +298,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 _turn_buffers = None
 _buf_params = (None, None)
 
-def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.5):
+def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.25):
     global _turn_buffers, _buf_params
 
     dt = env.cfg.sim.dt * env.cfg.decimation
