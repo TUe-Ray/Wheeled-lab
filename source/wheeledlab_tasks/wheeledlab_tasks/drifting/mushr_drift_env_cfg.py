@@ -370,7 +370,7 @@ class TraverseABCfg:
 
     # penalize any movement away
     away_penalty = RewTerm(
-        func=away_movement_penalty
+        func=away_movement_penalty,
         weight=30.0,
     )
 
@@ -386,7 +386,7 @@ class TraverseABCfg:
 
     # sustained turns (as before)
     sustained_turn = RewTerm(
-        func=sustained_turn_reward
+        func=sustained_turn_reward,
         weight=94.0,
     )
 
