@@ -440,17 +440,7 @@ def velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     raw = (vel * to_g).sum(dim=-1)
     return torch.relu(raw)
 
-def step_progress(env, goal=torch.tensor([5.0,5.0])):
-    global _prev_dist
-    pos  = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    if _prev_dist is None:
-        prog = torch.zeros_like(dist)
-    else:
-        prog = _prev_dist - dist
-    _prev_dist = dist.clone()
-    #print("Progress:" , prog)
-    return prog
+
 
 def sustained_turn_reward(env, window_s: float = 1.0):
     global _turn_buffers
@@ -525,10 +515,6 @@ class TraverseABCfg:
         weight=10.0,       # scale this up or down as you see fit
     )
 
-    step_progress = RewTerm(
-        func=step_progress,
-        weight=10.0,    # tune this scale so it's on par with your other rewards
-    )
 
     # timeout_penalty = RewTerm(
     #     func=mdp.rewards.is_terminated,
