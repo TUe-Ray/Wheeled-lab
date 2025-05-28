@@ -298,7 +298,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 _turn_buffers = None
 _buf_params = (None, None)
 
-def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.25):
+def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.1):
     global _turn_buffers, _buf_params
 
     dt = env.cfg.sim.dt * env.cfg.decimation
@@ -364,6 +364,10 @@ def distance_penalty(env, goal=torch.tensor([5.0, 5.0])):
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     return -dist
 
+def instant_turn_reward(env, scale=0.1):
+    w = mdp.base_ang_vel(env)[..., 2].abs()
+    return w * scale
+
 @configclass
 class TraverseABCfg:
 
@@ -394,6 +398,11 @@ class TraverseABCfg:
         func=sustained_turn_reward,
         weight=905.0,
     )
+    instant_turn = RewTerm(
+    func=instant_turn_reward,
+    params={"scale": 0.05},
+    weight=1.0,
+)
 
 
 ########################
