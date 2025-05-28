@@ -61,6 +61,41 @@ def clear_turn_buffers(env, env_ids):
             _turn_buffers[i].clear()
     # return a dummy tensor so IsaacLab is happy
     return torch.zeros(env.num_envs, device=env.device)
+
+def signed_velocity_to_goal(env, goal=torch.tensor([5.0, 5.0])):
+    # current positions (B,2) and velocities (B,2)
+    pos = mdp.root_pos_w(env)[..., :2]
+    vel = mdp.base_lin_vel(env)[..., :2]
+    # compute unit “to-goal” vectors
+    to_goal = goal.to(env.device) - pos                   # (B,2)
+    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
+    # dot product: positive if your velocity has a component toward the goal,
+    # negative if it points away
+    return (vel * to_goal_norm).sum(dim=-1)                # (B,)
+
+
+_prev_dists = None
+
+def reset_dist_tracker(env, env_ids):
+    global _prev_dists
+    _prev_dists = None
+    # no reward on reset
+    return torch.zeros(env.num_envs, device=env.device)
+
+def step_progress(env, goal=torch.tensor([5.0, 5.0])):
+    global _prev_dists
+    pos = mdp.root_pos_w(env)[..., :2]           # (B,2)
+    dists = torch.norm(goal.to(env.device) - pos, dim=-1)  # (B,)
+
+    if _prev_dists is None:
+        # first call after reset → no progress
+        prog = torch.zeros_like(dists)
+    else:
+        prog = _prev_dists - dists  # positive if we got closer
+
+    _prev_dists = dists.clone()
+    return prog
+
 ###################
 ###### SCENE ######
 ###################
@@ -174,6 +209,11 @@ class DriftEventsCfg:
     )
     clear_turn = EventTerm(
         func=clear_turn_buffers,
+        mode="reset",
+    )
+
+    reset_progress = EventTerm(
+        func=reset_dist_tracker,
         mode="reset",
     )
 
@@ -459,6 +499,7 @@ def sustained_small_turn_reward(env, window_s: float = 0.5):
     return out
 
 
+
 @configclass
 class TraverseABCfg:
 
@@ -478,6 +519,15 @@ class TraverseABCfg:
     alive = RewTerm(
         func=mdp.rewards.is_alive,
         weight=1.0,
+    )
+    move_signed = RewTerm(
+        func=signed_velocity_to_goal,
+        weight=10.0,       # scale this up or down as you see fit
+    )
+
+    step_progress = RewTerm(
+        func=step_progress,
+        weight=10.0,    # tune this scale so it's on par with your other rewards
     )
 
     # timeout_penalty = RewTerm(
@@ -519,6 +569,15 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
+            "increase": -9,
+            "episodes_per_increase": 20,
+            "max_increases": 10,
+        },
+    )
+    decay_small_turn = CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "sustained_small_turn",
             "increase": -9,
             "episodes_per_increase": 20,
             "max_increases": 10,
