@@ -346,7 +346,7 @@ def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.1):
     global _turn_buffers, _buf_params
 
     # how many steps in window_s seconds
-    dt = env.cfg.sim.dt * env.decimation
+    dt = env.cfg.sim.dt * 10
     window_steps = max(1, int(window_s / dt))
     N = env.num_envs
 
