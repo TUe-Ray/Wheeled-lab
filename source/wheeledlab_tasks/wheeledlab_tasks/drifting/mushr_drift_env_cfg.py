@@ -543,13 +543,23 @@ class DriftCurriculumCfg:
     decay_flip = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "sustained_turn",
+            "reward_term_name": "flip_penalty",
             "increase": -100,
             "episodes_per_increase": 4,
             "max_increases": 5,
         },
     )
 
+
+    decay_turn= CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "sustained_turn",
+            "increase": -100,
+            "episodes_per_increase": 4,
+            "max_increases": 5,
+        },
+    )
 
 
 
