@@ -475,7 +475,7 @@ def flip_penalty(env):
     pitch = torch.asin(sinp)
 
     # normalize to [0,1]
-    return ((roll.abs() + pitch.abs()) / math.pi).clamp(0.0, 1.0)
+    return -((roll.abs() + pitch.abs()) / math.pi).clamp(0.0, 1.0)
 
 @configclass
 class TraverseABCfg:
@@ -550,15 +550,7 @@ class DriftCurriculumCfg:
         },
     )
 
-    decay_turn = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "turn_in_place",
-            "increase": -20,
-            "episodes_per_increase": 5,
-            "max_increases": 5,
-        },
-    )
+
 
 
 ##########################
