@@ -216,7 +216,7 @@ class DriftEventsCfg:
     mode="reset",
     params={
         "asset_cfg": SceneEntityCfg("robot"),
-        "pos": [-2.0, -3.0, 0.06],
+        "pos": [-2.0, -3.0, 0.15],
         "yaw_range": math.pi,   # ±180°
     },
 )
