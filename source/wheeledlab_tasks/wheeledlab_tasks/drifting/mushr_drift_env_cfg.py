@@ -586,7 +586,7 @@ class MushrDriftPlayEnvCfg(MushrDriftRLEnvCfg):
     """no terminations"""
 
     events: DriftEventsCfg = DriftEventsRandomCfg(
-        reset_root_state = EventTerm(
+        reset_random_yaw = EventTerm(
             func=reset_root_state_along_track,
             params={
                 "dist_noise": 0.,
