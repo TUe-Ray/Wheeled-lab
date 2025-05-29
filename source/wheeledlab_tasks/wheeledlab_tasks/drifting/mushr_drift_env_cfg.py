@@ -206,39 +206,44 @@ def random_yaw_reset(env, env_ids,
                      asset_cfg: SceneEntityCfg,
                      pos: list[float],
                      yaw_range: float = math.pi):
-    # 1) figure out how many envs are being reset
+    # Determine how many envs we're resetting:
     if isinstance(env_ids, slice):
-        # e.g. slice(0, 1024) → 1024
         N = env_ids.stop - env_ids.start
+    elif hasattr(env_ids, "numel"):
+        N = env_ids.numel()
     else:
-        N = env_ids.numel() if hasattr(env_ids, "numel") else len(env_ids)
+        N = len(env_ids)
 
     device = env.device
 
-    # 2) build position tensor [N x 3]
+    # Build position [N×3]
     pos_t = torch.tensor(pos, device=device, dtype=torch.float32)
-    pos_t = pos_t.view(1, 3).repeat(N, 1)
+    pos_t = pos_t.view(1,3).repeat(N,1)
 
-    # 3) sample random yaw for each env
+    # Sample random yaw ∈ [−yaw_range, +yaw_range]
     yaw = (torch.rand(N, device=device) * 2 - 1) * yaw_range
     zero = torch.zeros_like(yaw)
-    quat = euler_to_quat(zero, zero, yaw)  # [N x 4], now unit quaternions
-    rot = quat.cpu().tolist()  # list of lists
-        # after quat = euler_to_quat(...)
-    lens = quat.norm(dim=-1)
-    print("quat norms:", lens)
+    quat = euler_to_quat(zero, zero, yaw)  # [N×4]
 
-    # now delegate:
-    return reset_root_state_new(
-        env, env_ids,
-        asset_cfg=asset_cfg,
-        pos=pos,
-        rot=rot,
+    # Write root pose
+    asset = env.scene[asset_cfg.name]
+    root_state = torch.cat([pos_t, quat], dim=-1)  # [N×7]
+    asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
+
+    # Zero out root velocities (lin + ang)
+    asset.write_root_velocity_to_sim(
+        torch.zeros((N,6), device=device, dtype=torch.float32),
+        env_ids=env_ids
     )
 
-    # return dummy tensor so IsaacLab is happy
-    return torch.zeros(env.num_envs, device=device)
+    # *Also* clear any joint targets / forces to avoid residual impulses:
+    num_joints = asset.num_joints
+    zero_joint_vel = torch.zeros((N, num_joints), device=device)
+    asset.set_joint_velocity_target(zero_joint_vel, joint_ids=range(num_joints))
+    asset.clear_forces(env_ids=env_ids)
 
+    # Return dummy
+    return torch.zeros(env.num_envs, device=device)
 @configclass
 class DriftEventsCfg:
 
