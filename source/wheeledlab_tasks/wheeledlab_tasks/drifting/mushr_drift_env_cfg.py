@@ -185,28 +185,25 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
+def yaw_to_quat(yaw: torch.Tensor) -> torch.Tensor:
+    """
+    yaw: (N,) tensor of angles in radians
+    returns (N,4) tensor [qx,qy,qz,qw]
+    """
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    # roll = pitch = 0
+    return torch.stack([torch.zeros_like(yaw),  # qx
+                        torch.zeros_like(yaw),  # qy
+                        sy,                     # qz
+                        cy],                    # qw
+                       dim=-1)
 
-def euler_to_quat(roll: torch.Tensor,
-                  pitch: torch.Tensor,
-                  yaw: torch.Tensor) -> torch.Tensor:
-    cr = torch.cos(roll * 0.5); sr = torch.sin(roll * 0.5)
-    cp = torch.cos(pitch * 0.5); sp = torch.sin(pitch * 0.5)
-    cy = torch.cos(yaw * 0.5); sy = torch.sin(yaw * 0.5)
-
-    qw = cr * cp * cy + sr * sp * sy
-    qx = sr * cp * cy - cr * sp * sy
-    qy = cr * sp * cy + sr * cp * sy
-    qz = cr * cp * sy - sr * sp * cy
-
-    quat = torch.stack([qx, qy, qz, qw], dim=-1)
-    # normalize to unit length
-    return quat / quat.norm(dim=-1, keepdim=True)
-
-def random_yaw_reset(env, env_ids,
-                     asset_cfg: SceneEntityCfg,
-                     pos: list[float],
-                     yaw_range: float = math.pi):
-    # Determine how many envs we're resetting:
+def random_spawn_reset(env, env_ids,
+                       asset_cfg: SceneEntityCfg,
+                       pos: list[float],
+                       yaw_range: float = math.pi):
+    # 1) determine how many envs to reset
     if isinstance(env_ids, slice):
         N = env_ids.stop - env_ids.start
     elif hasattr(env_ids, "numel"):
@@ -214,36 +211,22 @@ def random_yaw_reset(env, env_ids,
     else:
         N = len(env_ids)
 
-    device = env.device
+    # 2) sample a random yaw per env
+    yaw = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
+    # 3) build the quaternion batch
+    quat = yaw_to_quat(yaw)  # shape (N,4)
 
-    # Build position [N×3]
-    pos_t = torch.tensor(pos, device=device, dtype=torch.float32)
-    pos_t = pos_t.view(1,3).repeat(N,1)
-
-    # Sample random yaw ∈ [−yaw_range, +yaw_range]
-    yaw = (torch.rand(N, device=device) * 2 - 1) * yaw_range
-    zero = torch.zeros_like(yaw)
-    quat = euler_to_quat(zero, zero, yaw)  # [N×4]
-
-    # Write root pose
-    asset = env.scene[asset_cfg.name]
-    root_state = torch.cat([pos_t, quat], dim=-1)  # [N×7]
-    asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
-
-    # Zero out root velocities (lin + ang)
-    asset.write_root_velocity_to_sim(
-        torch.zeros((N,6), device=device, dtype=torch.float32),
-        env_ids=env_ids
+    # 4) call your existing reset_root_state_new with the **tensor** quat
+    #    we just need to pass it in as the rot argument
+    #    since reset_root_state_new repeats lists to match N,
+    #    here we override it by passing a tensor directly:
+    return reset_root_state_new(
+        env,
+        env_ids,
+        asset_cfg=asset_cfg,
+        pos=pos,
+        rot=quat,        # tensor (N,4)
     )
-
-    # *Also* clear any joint targets / forces to avoid residual impulses:
-    num_joints = asset.num_joints
-    zero_joint_vel = torch.zeros((N, num_joints), device=device)
-    asset.set_joint_velocity_target(zero_joint_vel, joint_ids=range(num_joints))
-    asset.clear_forces(env_ids=env_ids)
-
-    # Return dummy
-    return torch.zeros(env.num_envs, device=device)
 @configclass
 class DriftEventsCfg:
 
@@ -251,13 +234,13 @@ class DriftEventsCfg:
         func=reset_progress_tracker,
         mode="reset",
     )
-    reset_random_yaw = EventTerm(
-        func=random_yaw_reset,
+    reset_random_orientation = EventTerm(
+        func=random_spawn_reset,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2.0, -3.0, 0.06],
-            "yaw_range": math.pi,   # +/-180° each episode
+            "pos": [-2.0, -3.0, 0.06],   # keep a slight z offset
+            "yaw_range": math.pi,       # ±180° uniform
         },
     )
     clear_turn = EventTerm(
@@ -296,28 +279,28 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         },
     )
 
-    push_robots_hf = EventTerm( # High frequency small pushes
-        func=mdp.push_by_setting_velocity,
-        mode="interval",
-        interval_range_s=(0.1, 0.4),
-        params={
-            "velocity_range":{
-                "x": (-0.1, 0.1),
-                "y": (-0.03, 0.03),
-                "yaw": (-0.6, 0.6)
-            },
-        },
-    )
+    # push_robots_hf = EventTerm( # High frequency small pushes
+    #     func=mdp.push_by_setting_velocity,
+    #     mode="interval",
+    #     interval_range_s=(0.1, 0.4),
+    #     params={
+    #         "velocity_range":{
+    #             "x": (-0.1, 0.1),
+    #             "y": (-0.03, 0.03),
+    #             "yaw": (-0.6, 0.6)
+    #         },
+    #     },
+    # )
 
-    push_robots_lf = EventTerm( # Low frequency large pushes
-        func=mdp.push_by_setting_velocity,
-        mode="startup",
-        params={
-            "velocity_range":{
-                "yaw": (-2, 2)
-            },
-        },
-    )
+    # push_robots_lf = EventTerm( # Low frequency large pushes
+    #     func=mdp.push_by_setting_velocity,
+    #     mode="startup",
+    #     params={
+    #         "velocity_range":{
+    #             "yaw": (-2, 2)
+    #         },
+    #     },
+    # )
 
     add_base_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
