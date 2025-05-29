@@ -145,7 +145,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-    obstacle1 = AssetBaseCfg(
+    obstacle1:   AssetBaseCfg            = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
@@ -160,7 +160,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
-        mesh_prim_paths=["/World/envs/env_0/Obstacle1"],
+        mesh_prim_paths=[ "{ENV_REGEX_NS}/Obstacle1" ],
         #mesh_prim_paths=["/World/ground"],
 
         
@@ -252,7 +252,7 @@ def randomize_obstacle_pose(env, env_ids,
             if (torch.norm(goals - torch.tensor([x,y],device=env.device)) >= min_dist
              and torch.norm(starts- torch.tensor([x,y],device=env.device)) >= min_dist):
                 break
-        pose = torch.tensor([[x, y, 0.0, 1,0,0,0]], device=env.device)  # pos + identity quat
+        pose = torch.tensor([[x,y,0.0, 0.0,0.0,0.0,1.0]], device=env.device)
         env.scene.obstacle1.write_root_pose_to_sim(pose, env_ids=torch.tensor([i],device=env.device))
     return torch.zeros(N, device=env.device)
 
