@@ -404,6 +404,27 @@ def goal_reached_reward(env, goal=torch.tensor([5.0,5.0]), threshold=0.3):
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     out  = torch.where(dist < threshold, 1.0, 0.0)
     return out
+V_TRANS_MAX = 3.0  # max linear speed (m/s)
+
+def turn_in_place_reward(env):
+    """
+    Rewards yaw‐rate when the car is effectively not translating.
+    Output is normalized to [0,1].
+    """
+    # 1) get absolute yaw‐rate (rad/s)
+    w = mdp.base_ang_vel(env)[..., 2].abs()  # shape (B,)
+    w = w.clamp(max=W_MAX)
+
+    # 2) get translational speed (m/s)
+    vel = mdp.base_lin_vel(env)[..., :2]  # shape (B,2)
+    v = torch.norm(vel, dim=-1).clamp(max=V_TRANS_MAX)
+
+    # 3) translation penalty factor in [0,1]
+    #    = 1 when v=0 (pure spin), → 0 when v>=V_TRANS_MAX
+    trans_factor = (1.0 - v / V_TRANS_MAX).clamp(0.0, 1.0)
+
+    # 4) reward = (|w|/W_MAX) * trans_factor  ∈ [0,1]
+    return (w / W_MAX) * trans_factor
 
 @configclass
 class TraverseABCfg:
@@ -440,6 +461,11 @@ class TraverseABCfg:
     params={"scale": 0.05},
     weight=10005,
 )
+    
+    turn_in_place = RewTerm(
+        func=turn_in_place_reward,
+        weight=101,   # since the output is in [0,1], weight=1 gives you up to +1 per step
+    )
 
 
 ########################
@@ -470,6 +496,16 @@ class DriftCurriculumCfg:
         },
     )
 
+
+    decay_turn = CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "turn_in_place",
+            "increase": -20,
+            "episodes_per_increase": 5,
+            "max_increases": 5,
+        },
+    )
 
 
 ##########################
