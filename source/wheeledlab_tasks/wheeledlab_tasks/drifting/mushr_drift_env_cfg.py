@@ -322,7 +322,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot",  body_names=["base_link"]), #body_names=["main_body"]),
+            "asset_cfg": SceneEntityCfg("robot",  body_names=["main_body"]), #body_names=["base_link"]), #
             "mass_distribution_params": (0.3, 0.5),
             "operation": "add",
             "distribution": "uniform",
