@@ -216,7 +216,7 @@ class DriftEventsCfg:
     mode="reset",
     params={
         "asset_cfg": SceneEntityCfg("robot"),
-        "pos": [-2.0, -3.0, 0.15],
+        "pos": [-2.0, -3.0, 0.25],
         "yaw_range": math.pi,   # ±180°
     },
 )
@@ -403,13 +403,13 @@ class TraverseABCfg:
     # penalize any movement away
     away_penalty = RewTerm(
         func=away_movement_penalty,
-        weight=3,
+        weight=5,
     )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=2,
+        weight=5,
     )
 
     # keep your alive and reach terms if you want
@@ -424,12 +424,12 @@ class TraverseABCfg:
     instant_turn = RewTerm(
     func=instant_turn_reward,
     params={"scale": 0.05},
-    weight=10005,
+    weight=10001,
 )
     
     turn_in_place = RewTerm(
         func=turn_in_place_reward,
-        weight=10,   # since the output is in [0,1], weight=1 gives you up to +1 per step
+        weight=101,   # since the output is in [0,1], weight=1 gives you up to +1 per step
     )
 
 
