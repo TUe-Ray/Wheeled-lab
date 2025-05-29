@@ -160,7 +160,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
-        mesh_prim_paths=[ "{ENV_REGEX_NS}/Obstacle1" ],
+        mesh_prim_paths=["/World/envs/env_.*/Obstacle1"],
         #mesh_prim_paths=["/World/ground"],
 
         
@@ -233,7 +233,6 @@ def randomize_obstacle_size(env, env_ids,
     sizes = torch.empty((N,3), device=env.device).uniform_(size_range[0], size_range[1])
     obs = env.scene.obstacle1
     for i in env_ids.tolist():
-        # set its scale; note: if your API wants half-extents you may need to /2
         obs.set_scale(sizes[i].cpu().tolist(), env_ids=torch.tensor([i],device=env.device))
     return torch.zeros(N, device=env.device)
 
