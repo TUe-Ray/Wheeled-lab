@@ -204,6 +204,32 @@ def random_flat_yaw(env, env_ids, asset_cfg, pos, yaw_range=math.pi):
     asset.write_root_velocity_to_sim(torch.zeros((N,6),device=env.device), env_ids=env_ids)
     return torch.zeros(env.num_envs, device=env.device)
 
+def enforce_flat(env, env_ids):
+    asset = env.scene["robot"]
+    # read current pose
+    state = asset.read_root_pose(env_ids)        # (N×7) [x,y,z,qx,qy,qz,qw]
+    pos, quat = state[..., :3], state[..., 3:]
+    # compute yaw from quat
+    z, w = quat[..., 2], quat[..., 3]
+    yaw = torch.atan2(2*(w*z), 1 - 2*(z*z))
+    half = yaw * 0.5
+    flat_q = torch.stack([
+        torch.zeros_like(half),  # qx
+        torch.zeros_like(half),  # qy
+        torch.sin(half),         # qz
+        torch.cos(half)          # qw
+    ], dim=-1)
+    # write back pose + zero velocity
+    new_state = torch.cat([pos, flat_q], dim=-1)
+    asset.write_root_pose_to_sim(new_state, env_ids=env_ids)
+    asset.write_root_velocity_to_sim(
+        torch.zeros((len(env_ids),6), device=env.device),
+        env_ids=env_ids
+    )
+    return torch.zeros(env.num_envs, device=env.device)
+
+
+
 @configclass
 class DriftEventsCfg:
 
@@ -228,6 +254,11 @@ class DriftEventsCfg:
     reset_progress = EventTerm(
         func=reset_dist_tracker,
         mode="reset",
+    )
+    flatten_term = EventTerm(
+        func=enforce_flat,
+        mode="interval",
+        interval_range_s=(0.01, 0.02),  # run every 10–20ms
     )
 
 @configclass
