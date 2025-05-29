@@ -223,15 +223,18 @@ def random_yaw_reset(env, env_ids,
     yaw = (torch.rand(N, device=device) * 2 - 1) * yaw_range
     zero = torch.zeros_like(yaw)
     quat = euler_to_quat(zero, zero, yaw)  # [N x 4], now unit quaternions
+    rot = quat.cpu().tolist()  # list of lists
+        # after quat = euler_to_quat(...)
+    lens = quat.norm(dim=-1)
+    print("quat norms:", lens)
 
-    # 4) write the new root pose
-    asset = env.scene[asset_cfg.name]
-    root_state = torch.cat([pos_t, quat], dim=-1)  # [N x 7]
-    asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
-
-    # 5) zero out all root velocities (linear + angular)
-    zero_vel = torch.zeros((N, 6), device=device, dtype=torch.float32)
-    asset.write_root_velocity_to_sim(zero_vel, env_ids=env_ids)
+    # now delegate:
+    return reset_root_state_new(
+        env, env_ids,
+        asset_cfg=asset_cfg,
+        pos=pos,
+        rot=rot,
+    )
 
     # return dummy tensor so IsaacLab is happy
     return torch.zeros(env.num_envs, device=device)
@@ -248,7 +251,7 @@ class DriftEventsCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2.0, -3.0, 0.0],
+            "pos": [-2.0, -3.0, 0.06],
             "yaw_range": math.pi,   # +/-180° each episode
         },
     )
@@ -264,12 +267,6 @@ class DriftEventsCfg:
 
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
-
-    push_start = EventTerm(
-    func=mdp.push_by_setting_velocity,
-    mode="reset",
-    params={"velocity_range": {"yaw": (-2.0,2.0)}}
-)
 
     change_wheel_friction = EventTerm(
         func=mdp.randomize_rigid_body_material,
