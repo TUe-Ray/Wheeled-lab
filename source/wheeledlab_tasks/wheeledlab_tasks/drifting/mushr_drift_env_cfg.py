@@ -200,35 +200,62 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
     Interval term: while each env’s timer > 0, command a random yaw velocity.
     """
     global _spin_timers
-    # compute dt once (matching your sim-rate)
     dt = env.cfg.sim.dt * env.cfg.decimation  # e.g. 0.005 * 10 = 0.05s
 
-    # sample a random yaw-rate for every env
-    rand_w = (torch.rand(env.num_envs, device=env.device) * 2 - 1) * max_w
+    # For each env in this batch, decrement its timer
+    # and collect those still active
+    active = []
+    for i in env_ids.tolist():
+        if _spin_timers[i] > 0.0:
+            _spin_timers[i] -= dt
+            active.append(int(i))
 
-    # build a mask of which envs still spinning
-    active = _spin_timers > 0.0
-    # decrement their timers
-    _spin_timers[active] -= dt
-
-    if active.any():
-        # apply those yaw pushes *only* to the active envs
+    # If any env still has timer > 0, push a random yaw to those
+    if active:
         mdp.push_by_setting_velocity(
             env,
-            env_ids=env_ids,
+            env_ids=active,
             velocity_range={
                 "x": (0.0, 0.0),
                 "y": (0.0, 0.0),
                 "yaw": (-max_w, max_w),
             },
-            # use the sampled rand_w per-env
-            overrides={"yaw": rand_w.tolist()}
         )
+
     return torch.zeros(env.num_envs, device=env.device)
 
 @configclass
 class DriftEventsCfg:
-    # Track step‐progress
+    # … your other reset terms …
+
+    reset_spin_timer = EventTerm(
+        func=reset_spin_timer,
+        mode="reset",
+        params={"duration": 1.0},
+    )
+
+    reset_root_state = EventTerm(
+        func=reset_root_state_new,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "pos": [-2.0, -3.0, 0.0],
+            "rot": [0.0, 0.0, 0.0, 1.0],
+        },
+    )
+
+    clear_turn_buffers = EventTerm(
+        func=clear_turn_buffers,
+        mode="reset",
+    )
+
+    spin_in_place = EventTerm(
+        func=spin_in_place,
+        mode="interval",
+        interval_range_s=(0.005 * 10, 0.005 * 10),  # every physics step
+        params={"max_w": 6.0},
+    )
+
     reset_step_progress = EventTerm(
         func=reset_progress_tracker,
         mode="reset",
@@ -240,37 +267,6 @@ class DriftEventsCfg:
         mode="reset",
     )
 
-    # Spin‐timer reset
-    reset_spin_timer = EventTerm(
-        func=reset_spin_timer,
-        mode="reset",
-        params={"duration": 1.0},
-    )
-
-    # Root‐state reset
-    reset_root_state = EventTerm(
-        func=reset_root_state_new,
-        mode="reset",
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2.0, -3.0, 0.0],
-            "rot": [0.0, 0.0, 0.0, 1.0],
-        },
-    )
-
-    # Clear turn histories
-    clear_turn_buffers = EventTerm(
-        func=clear_turn_buffers,
-        mode="reset",
-    )
-
-    # Spin in place every step while timer > 0
-    spin_in_place = EventTerm(
-        func=spin_in_place,
-        mode="interval",
-        interval_range_s=(0.005 * 10, 0.005 * 10),
-        params={"max_w": 6.0},
-    )
 
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
