@@ -149,7 +149,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Obstacle1",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
-            size=(0.5, 0.5 , 1.5),
+            size=(1.5, 1.5 , 1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
@@ -456,6 +456,33 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     #    → mean gives you a [0,1] per‐env penalty
     return penalty_beams.mean(dim=-1)
 
+
+def flip_penalty(env):
+    """
+    Penalize non‐zero roll or pitch.  
+    Compute roll & pitch from the base quaternion and return 
+    (|roll| + |pitch|) / π ∈ [0,1], so 0 when flat, 1 when tipped 180°.
+    """
+    # 1) grab the base orientation quaternion [qx,qy,qz,qw]
+    quat = mdp.root_quat(env)               # shape (B,4)
+    qx, qy, qz, qw = quat.unbind(dim=-1)
+
+    # 2) compute roll & pitch via standard formulas
+    # roll = atan2(2(w*x + y*z), 1 − 2(x² + y²))
+    num_r = 2 * (qw*qx + qy*qz)
+    den_r = 1 - 2 * (qx*qx + qy*qy)
+    roll   = torch.atan2(num_r, den_r)
+
+    # pitch = asin(2(w*y − z*x))
+    sinp   = (2 * (qw*qy - qz*qx)).clamp(-1.0, 1.0)
+    pitch  = torch.asin(sinp)
+
+
+    # 3) normalize to [0,1]
+    pen = (roll.abs() + pitch.abs()) / math.pi
+    return pen.clamp(0.0, 1.0)
+
+
 @configclass
 class TraverseABCfg:
 
@@ -491,6 +518,11 @@ class TraverseABCfg:
     weight=10001,
 )
     
+    flip_penalty = RewTerm(
+        func=flip_penalty,
+        weight=500,    
+    )
+    
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
         weight=5.0,         # tweak as needed
@@ -514,17 +546,15 @@ class DriftCurriculumCfg:
         },
     )
 
-    # Every 20 eps reduce the alignment reward by 4, up to 5 times (20→0)
-    decay_turn = CurrTerm(
+    decay_flip = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "instant_turn",
-            "increase": -200,
-            "episodes_per_increase": 5,
+            "reward_term_name": "sustained_turn",
+            "increase": -100,
+            "episodes_per_increase": 4,
             "max_increases": 5,
         },
     )
-
 
     decay_turn = CurrTerm(
         func=increase_reward_weight_over_time,
