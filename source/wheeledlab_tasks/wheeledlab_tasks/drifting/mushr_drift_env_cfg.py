@@ -185,48 +185,25 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
-def yaw_to_quat(yaw: torch.Tensor) -> torch.Tensor:
-    """
-    yaw: (N,) tensor of angles in radians
-    returns (N,4) tensor [qx,qy,qz,qw]
-    """
-    cy = torch.cos(yaw * 0.5)
-    sy = torch.sin(yaw * 0.5)
-    # roll = pitch = 0
-    return torch.stack([torch.zeros_like(yaw),  # qx
-                        torch.zeros_like(yaw),  # qy
-                        sy,                     # qz
-                        cy],                    # qw
-                       dim=-1)
+def random_flat_yaw(env, env_ids, asset_cfg, pos, yaw_range=math.pi):
+    # compute N
+    N = env_ids.stop - env_ids.start if isinstance(env_ids, slice) else env_ids.numel()
+    # sample yaw ∈ [–yaw_range, +yaw_range]
+    yaw = (torch.rand(N, device=env.device)*2 - 1) * yaw_range
+    qz  = torch.sin(yaw * 0.5)
+    qw  = torch.cos(yaw * 0.5)
+    # build [N×3] pos and [N×4] rot
+    pos_t = torch.tensor(pos, device=env.device).view(1,3).repeat(N,1)
+    rot_t = torch.stack([torch.zeros(N,device=env.device),
+                         torch.zeros(N,device=env.device),
+                         qz, qw], dim=-1)
+    # apply exactly like reset_root_state_new would:
+    asset = env.scene[asset_cfg.name]
+    state = torch.cat([pos_t, rot_t], dim=-1)
+    asset.write_root_pose_to_sim(state, env_ids=env_ids)
+    asset.write_root_velocity_to_sim(torch.zeros((N,6),device=env.device), env_ids=env_ids)
+    return torch.zeros(env.num_envs, device=env.device)
 
-def random_spawn_reset(env, env_ids,
-                       asset_cfg: SceneEntityCfg,
-                       pos: list[float],
-                       yaw_range: float = math.pi):
-    # 1) determine how many envs to reset
-    if isinstance(env_ids, slice):
-        N = env_ids.stop - env_ids.start
-    elif hasattr(env_ids, "numel"):
-        N = env_ids.numel()
-    else:
-        N = len(env_ids)
-
-    # 2) sample a random yaw per env
-    yaw = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
-    # 3) build the quaternion batch
-    quat = yaw_to_quat(yaw)  # shape (N,4)
-
-    # 4) call your existing reset_root_state_new with the **tensor** quat
-    #    we just need to pass it in as the rot argument
-    #    since reset_root_state_new repeats lists to match N,
-    #    here we override it by passing a tensor directly:
-    return reset_root_state_new(
-        env,
-        env_ids,
-        asset_cfg=asset_cfg,
-        pos=pos,
-        rot=quat,        # tensor (N,4)
-    )
 @configclass
 class DriftEventsCfg:
 
@@ -234,15 +211,15 @@ class DriftEventsCfg:
         func=reset_progress_tracker,
         mode="reset",
     )
-    reset_random_orientation = EventTerm(
-        func=random_spawn_reset,
-        mode="reset",
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2.0, -3.0, 0.06],   # keep a slight z offset
-            "yaw_range": math.pi,       # ±180° uniform
-        },
-    )
+    reset_root_state = EventTerm(
+    func=random_flat_yaw,
+    mode="reset",
+    params={
+        "asset_cfg": SceneEntityCfg("robot"),
+        "pos": [-2.0, -3.0, 0.06],
+        "yaw_range": math.pi,   # ±180°
+    },
+)
     clear_turn = EventTerm(
         func=clear_turn_buffers,
         mode="reset",
@@ -452,7 +429,7 @@ class TraverseABCfg:
     
     turn_in_place = RewTerm(
         func=turn_in_place_reward,
-        weight=101,   # since the output is in [0,1], weight=1 gives you up to +1 per step
+        weight=10,   # since the output is in [0,1], weight=1 gives you up to +1 per step
     )
 
 
@@ -591,7 +568,7 @@ class MushrDriftPlayEnvCfg(MushrDriftRLEnvCfg):
     """no terminations"""
 
     events: DriftEventsCfg = DriftEventsRandomCfg(
-        reset_random_orientation = EventTerm(
+        reset_root_state = EventTerm(
             func=reset_root_state_along_track,
             params={
                 "dist_noise": 0.,
