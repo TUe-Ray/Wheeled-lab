@@ -156,7 +156,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
 # LiDAR sensor
     ray_caster = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/{ENV_REGEX_NS}/Robot/main_body", #Robot/mushr_nano/base_link",   
+        prim_path="{ENV_REGEX_NS}/Robot/main_body", #Robot/mushr_nano/base_link",   
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
