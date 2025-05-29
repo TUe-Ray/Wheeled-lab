@@ -211,45 +211,34 @@ def random_yaw_reset(env, env_ids,
                      asset_cfg: SceneEntityCfg,
                      pos: list[float],
                      yaw_range: float = math.pi):
-    """
-    env_ids: Tensor of indices to reset this call
-    asset_cfg: must match your robot
-    pos: fixed [x,y,z] start
-    yaw_range: max absolute yaw to sample (i.e ±yaw_range)
-    """
-    # number of envs being reset
-    if hasattr(env_ids, "tolist"):
+    # determine N
+    if isinstance(env_ids, slice):
+        N = env.num_envs
+    elif hasattr(env_ids, "tolist"):
         N = len(env_ids.tolist())
     else:
-        N = int(env_ids.stop - env_ids.start)  if isinstance(env_ids, slice) else env.num_envs
+        N = int(env_ids)
 
-    # 1) build position tensor [N×3]
-    pos_t = (
-        torch.tensor(pos, device=env.device)
-             .view(1,3)
-             .repeat(N,1)
-    )
+    # 1) position tensor [N×3]
+    pos_t = torch.tensor(pos, device=env.device).view(1,3).repeat(N,1)
 
-    # 2) sample random yaw ∈ [–yaw_range, +yaw_range]
-    yaws = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
-    zeros = torch.zeros_like(yaws)
+    # 2) sample yaw ∈ [–yaw_range, +yaw_range]
+    yaw = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
+    zero = torch.zeros_like(yaw)
 
     # 3) convert to quaternion [N×4]
-    quat = euler_to_quat(
-        torch.stack([zeros, zeros, yaws], dim=-1)
-    )  # returns [N×4] in (x,y,z,w) order
+    quat = euler_to_quat(zero, zero, yaw)
 
-    # 4) write into sim
+    # 4) write state
     asset = env.scene[asset_cfg.name]
     root_state = torch.cat([pos_t, quat], dim=-1)  # [N×7]
     asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
     asset.write_root_velocity_to_sim(
-        torch.zeros((N,6), device=env.device), env_ids=env_ids
+        torch.zeros((N,6), device=env.device),
+        env_ids=env_ids,
     )
 
-    # IsaacLab expects a Tensor return (even if you ignore it)
     return torch.zeros(env.num_envs, device=env.device)
-
 
 @configclass
 class DriftEventsCfg:
