@@ -225,6 +225,86 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 
     return torch.zeros(env.num_envs, device=env.device)
 
+def randomize_obstacle_size(env, env_ids,
+                            size_range: tuple[float,float] = (0.5, 2.0)):
+    """Randomize obstacle1’s cuboid size in x/y (and maybe z) each episode."""
+    N = env.num_envs
+    # sample uniformly in [min,max]
+    sizes = torch.empty((N,3), device=env.device).uniform_(size_range[0], size_range[1])
+    obs = env.scene.obstacle1
+    for i in env_ids.tolist():
+        # set its scale; note: if your API wants half-extents you may need to /2
+        obs.set_scale(sizes[i].cpu().tolist(), env_ids=torch.tensor([i],device=env.device))
+    return torch.zeros(N, device=env.device)
+
+def randomize_obstacle_pose(env, env_ids,
+                            area: tuple[float,float,float,float] = (-5,5,-5,5),
+                            min_dist: float = 1.0):
+    """Place obstacle1 randomly, but ≥min_dist from start & goal."""
+    N = env.num_envs
+    starts = torch.tensor([-2.0, -3.0], device=env.device)
+    goals  = torch.tensor([ 5.0,  5.0], device=env.device)
+    for i in env_ids.tolist():
+        # rejection sample
+        while True:
+            x = float((area[1]-area[0])*torch.rand(1)+area[0])
+            y = float((area[3]-area[2])*torch.rand(1)+area[2])
+            if (torch.norm(goals - torch.tensor([x,y],device=env.device)) >= min_dist
+             and torch.norm(starts- torch.tensor([x,y],device=env.device)) >= min_dist):
+                break
+        pose = torch.tensor([[x, y, 0.0, 1,0,0,0]], device=env.device)  # pos + identity quat
+        env.scene.obstacle1.write_root_pose_to_sim(pose, env_ids=torch.tensor([i],device=env.device))
+    return torch.zeros(N, device=env.device)
+
+
+def randomize_robot_start(env, env_ids,
+                          area: tuple[float,float,float,float] = (-5,5,-5,5),
+                          min_dist: float = 1.0):
+    N = env.num_envs
+    obstacle_pos = env.scene.obstacle1.data.root_pos_w[..., :2][0]
+    goal_pos     = torch.tensor([5.0,5.0], device=env.device)
+    for i in env_ids.tolist():
+        while True:
+            x = float((area[1]-area[0])*torch.rand(1)+area[0])
+            y = float((area[3]-area[2])*torch.rand(1)+area[2])
+            pt = torch.tensor([x,y],device=env.device)
+            if (torch.norm(pt - obstacle_pos) >= min_dist
+             and torch.norm(pt - goal_pos)     >= min_dist):
+                break
+        # reuse your reset_root_state_new to write [x,y,0] + random yaw
+        reset_root_state_new(env,
+            torch.tensor([i], device=env.device),
+            asset_cfg=SceneEntityCfg("robot"),
+            pos=[x,y,0.0],
+            rot=[0,0,0,1],
+        )
+    return torch.zeros(N, device=env.device)
+
+
+def randomize_goal(env, env_ids,
+                   area=( -8, 8, -8, 8),
+                   min_dist=1.0):
+    N = env.num_envs
+    for i in env_ids.tolist():
+        while True:
+            gx = float((area[1]-area[0])*torch.rand(1)+area[0])
+            gy = float((area[3]-area[2])*torch.rand(1)+area[2])
+            # get robot pos
+            rp = mdp.root_pos_w(env)[i,:2]
+            # obstacle pos
+            op = env.scene.obstacle1.data.root_pos_w[i,:2]
+            if ( (rp - torch.tensor([gx,gy],device=env.device)).norm() >= min_dist
+              and (op - torch.tensor([gx,gy],device=env.device)).norm() >= min_dist ):
+                break
+        # write marker pose
+        pm = torch.tensor([[gx, gy, 0.0]], device=env.device)
+        env.scene.goal_marker.write_root_pose_to_sim(
+            torch.cat([pm, torch.ones((1,4),device=env.device)*0],dim=-1),
+            env_ids=torch.tensor([i],device=env.device)
+        )
+    return torch.zeros(N, device=env.device)
+
+
 @configclass
 class DriftEventsCfg:
     # … your other reset terms …
@@ -266,6 +346,26 @@ class DriftEventsCfg:
     reset_dist_progress = EventTerm(
         func=reset_dist_tracker,
         mode="reset",
+    )
+    randomize_obstacle_size = EventTerm(
+        func=randomize_obstacle_size,
+        mode="reset",
+        params={"size_range": (0.5,2.0)},
+    )
+    randomize_obstacle_pose = EventTerm(
+        func=randomize_obstacle_pose,
+        mode="reset",
+        params={"area":(-5,5,-5,5),"min_dist":2},
+    )
+    randomize_robot_start = EventTerm(
+        func=randomize_robot_start,
+        mode="reset",
+        params={"area":(-5,5,-5,5),"min_dist":2},
+    )
+    randomize_goal = EventTerm(
+        func=randomize_goal,
+        mode="reset",
+        params={"area":(-5,5,-5,5),"min_dist":2},
     )
 
 
@@ -504,13 +604,9 @@ class TraverseABCfg:
     # sustained turns (as before)
     sustained_turn = RewTerm(
         func=sustained_turn_reward,
-        weight=1005,
+        weight=10,
     )
-    instant_turn = RewTerm(
-    func=instant_turn_reward,
-    params={"scale": 0.05},
-    weight=10001,
-)
+
     
     flip_penalty = RewTerm(
         func=flip_penalty,
@@ -534,8 +630,8 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
-            "increase": -100,
-            "episodes_per_increase": 7,
+            "increase": -1,
+            "episodes_per_increase": 2,
             "max_increases": 10,
         },
     )
@@ -550,16 +646,6 @@ class DriftCurriculumCfg:
         },
     )
 
-
-    decay_turn= CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "sustained_turn",
-            "increase": -100,
-            "episodes_per_increase": 4,
-            "max_increases": 5,
-        },
-    )
 
 
 
@@ -614,7 +700,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
 
     seed: int = 42
     num_envs: int = 1024
-    env_spacing: float = 0.
+    env_spacing: float = 16.
 
     # Basic Settings
     observations: BlindObsCfg = BlindObsCfg()
@@ -633,7 +719,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         super().__post_init__()
 
         # viewer settings
-        self.viewer.eye = [10., -10., 10.]
+        self.viewer.eye = [20., -20., 20.]
         self.viewer.lookat = [0.0, 0.0, 0.]
 
         self.sim.dt = 0.005  # 200 Hz
