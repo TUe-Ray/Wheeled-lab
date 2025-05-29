@@ -130,8 +130,8 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
     terrain = DriftTerrainImporterCfg()
-    #robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
-    robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     goal_marker = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/GoalMarker",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[5.0, 5.0, 0.0]),
@@ -156,7 +156,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
 # LiDAR sensor
     ray_caster = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/mushr_nano/base_link",    #"{ENV_REGEX_NS}/Robot/main_body",
+        prim_path="{ENV_REGEX_NS}/{ENV_REGEX_NS}/Robot/main_body", #Robot/mushr_nano/base_link",   
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
@@ -280,7 +280,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
             "dynamic_friction_range": (0.3, 0.5),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel_link"),#body_names=".*wheel"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"), #body_names=".*wheel_link"),
             "make_consistent": True,
         },
     )
@@ -289,40 +289,40 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_actuator_gains,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*back.*throttle"]),  #joint_names=[".*_wheel_joint"]),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_wheel_joint"]), #oint_names=[".*back.*throttle"]),  #
             "damping_distribution_params": (10.0, 50.0),
             "operation": "abs",
         },
     )
 
-    # push_robots_hf = EventTerm( # High frequency small pushes
-    #     func=mdp.push_by_setting_velocity,
-    #     mode="interval",
-    #     interval_range_s=(0.1, 0.4),
-    #     params={
-    #         "velocity_range":{
-    #             "x": (-0.1, 0.1),
-    #             "y": (-0.03, 0.03),
-    #             "yaw": (-0.6, 0.6)
-    #         },
-    #     },
-    # )
+    push_robots_hf = EventTerm( # High frequency small pushes
+        func=mdp.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(0.1, 0.4),
+        params={
+            "velocity_range":{
+                "x": (-0.1, 0.1),
+                "y": (-0.03, 0.03),
+                "yaw": (-0.6, 0.6)
+            },
+        },
+    )
 
-    # push_robots_lf = EventTerm( # Low frequency large pushes
-    #     func=mdp.push_by_setting_velocity,
-    #     mode="startup",
-    #     params={
-    #         "velocity_range":{
-    #             "yaw": (-2, 2)
-    #         },
-    #     },
-    # )
+    push_robots_lf = EventTerm( # Low frequency large pushes
+        func=mdp.push_by_setting_velocity,
+        mode="startup",
+        params={
+            "velocity_range":{
+                "yaw": (-2, 2)
+            },
+        },
+    )
 
     add_base_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["base_link"]),#body_names=["main_body"]),
+            "asset_cfg": SceneEntityCfg("robot",  body_names=["base_link"]), #body_names=["main_body"]),
             "mass_distribution_params": (0.3, 0.5),
             "operation": "add",
             "distribution": "uniform",
@@ -430,19 +430,44 @@ def turn_in_place_reward(env):
     # 4) reward = (|w|/W_MAX) * trans_factor  ∈ [0,1]
     return (w / W_MAX) * trans_factor
 
+
+def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
+    """
+    Continuous obstacle‐proximity penalty:
+      - If dist >= min_dist  →  0
+      - If dist <  min_dist  →  ((min_dist - dist)/min_dist)**exponent
+    Then we average over all beams to get a [0,1] signal per env.
+    """
+    # 1) pull out the front‐facing LiDAR hits
+    lidar      = env.scene.sensors["ray_caster"]
+    hits_w     = lidar.data.ray_hits_w              # (B, R, 3)
+    positions  = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # (B, 1, 2)
+
+    # 2) compute horizontal distance to each hit
+    dist       = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
+
+    # 3) how much inside the “safe” radius?
+    delta      = (min_dist - dist).clamp(min=0.0)  # (B, R)
+
+    # 4) normalize & raise to exponent
+    penalty_beams = (delta / min_dist) ** exponent  # (B, R), in [0,1]
+
+    # 5) average (or sum) across beams
+    #    → mean gives you a [0,1] per‐env penalty
+    return penalty_beams.mean(dim=-1)
+
 @configclass
 class TraverseABCfg:
 
-   # encourage forward‐progress toward the goal
-    # step_toward = RewTerm(
-    #     func=signed_velocity_toward_goal,
-    #     weight=20.0,
-    # )
+    step_toward = RewTerm(
+        func=signed_velocity_toward_goal,
+        weight=20.0,
+    )
 
     # penalize any movement away
     away_penalty = RewTerm(
         func=away_movement_penalty,
-        weight=5,
+        weight=0.2,
     )
 
     # penalize simply “parking” far from the goal
@@ -466,11 +491,11 @@ class TraverseABCfg:
     weight=10001,
 )
     
-    turn_in_place = RewTerm(
-        func=turn_in_place_reward,
-        weight=101,   # since the output is in [0,1], weight=1 gives you up to +1 per step
+    obstacle_penalty = RewTerm(
+        func=lidar_obstacle_penalty,
+        weight=5.0,         # tweak as needed
+        params={"min_dist": 0.3, "exponent": 2.0},
     )
-
 
 ########################
 ###### CURRICULUM ######
@@ -568,8 +593,8 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     # Basic Settings
     observations: BlindObsCfg = BlindObsCfg()
     # actions: MushrRWDActionCfg = MushrRWDActionCfg()
-    actions: SkidSteerActionCfg = SkidSteerActionCfg()
-    #actions: OriginActionCfg = OriginActionCfg()
+    #actions: SkidSteerActionCfg = SkidSteerActionCfg()
+    actions: OriginActionCfg = OriginActionCfg()
 
     # MDP Settings
     rewards: TraverseABCfg = TraverseABCfg()
@@ -588,7 +613,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 10  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 10
+        self.episode_length_s = 15
         self.actions.throttle.scale = (MAX_SPEED, 6)
 
         self.observations.policy.enable_corruption = True
