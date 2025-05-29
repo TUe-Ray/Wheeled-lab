@@ -5,7 +5,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.terrains import TerrainImporterCfg
-from isaaclab.utils import configclass, quat_from_euler
+from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg
@@ -185,6 +185,27 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 ###### EVENTS #######
 #####################
 
+def euler_to_quat(roll: torch.Tensor,
+                  pitch: torch.Tensor,
+                  yaw: torch.Tensor) -> torch.Tensor:
+    """
+    roll, pitch, yaw: each a (N,) tensor in radians
+    returns (N,4) tensor of [qx,qy,qz,qw]
+    """
+    cr = torch.cos(roll * 0.5)
+    sr = torch.sin(roll * 0.5)
+    cp = torch.cos(pitch * 0.5)
+    sp = torch.sin(pitch * 0.5)
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+
+    return torch.stack([qx, qy, qz, qw], dim=-1)
+
 def random_yaw_reset(env, env_ids,
                      asset_cfg: SceneEntityCfg,
                      pos: list[float],
@@ -213,7 +234,7 @@ def random_yaw_reset(env, env_ids,
     zeros = torch.zeros_like(yaws)
 
     # 3) convert to quaternion [N×4]
-    quat = quat_from_euler(
+    quat = euler_to_quat(
         torch.stack([zeros, zeros, yaws], dim=-1)
     )  # returns [N×4] in (x,y,z,w) order
 
