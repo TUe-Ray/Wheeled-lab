@@ -459,16 +459,14 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
 def flip_penalty(env):
     """
-    Penalize non‐zero roll or pitch.  
-    Computes roll & pitch from the base quaternion and returns 
-    (|roll| + |pitch|) / π ∈ [0,1].
+    Penalize roll/pitch tipping:
+      0 when flat, up to 1 when fully flipped.
     """
-    # 1) grab the full root state and slice off the quat
-    state = mdp.root_state_w(env)    # (B,7)
-    quat  = state[..., 3:7]          # (B,4)
-    qx, qy, qz, qw = quat.unbind(dim=-1)
+    # (w, x, y, z)
+    quat = mdp.root_quat_w(env)          # shape (B,4)
+    qw, qx, qy, qz = quat.unbind(-1)
 
-    # 2) compute roll & pitch
+    # compute roll & pitch
     num_r = 2*(qw*qx + qy*qz)
     den_r = 1 - 2*(qx*qx + qy*qy)
     roll  = torch.atan2(num_r, den_r)
@@ -476,10 +474,8 @@ def flip_penalty(env):
     sinp  = (2*(qw*qy - qz*qx)).clamp(-1.0, 1.0)
     pitch = torch.asin(sinp)
 
-    # 3) normalize to [0,1]
-    pen = (roll.abs() + pitch.abs()) / math.pi
-    return pen.clamp(0.0, 1.0)
-
+    # normalize to [0,1]
+    return ((roll.abs() + pitch.abs()) / math.pi).clamp(0.0, 1.0)
 
 @configclass
 class TraverseABCfg:
