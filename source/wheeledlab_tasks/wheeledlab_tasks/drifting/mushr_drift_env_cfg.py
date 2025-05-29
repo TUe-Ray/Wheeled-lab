@@ -228,19 +228,27 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 
 @configclass
 class DriftEventsCfg:
-    # Reset your progress/distance trackers first
-    reset_progress      = EventTerm(func=reset_progress_tracker, mode="reset")
-    reset_dist_tracker  = EventTerm(func=reset_dist_tracker,   mode="reset")
-
-    # 1) reset the spin‐timer
-    reset_spin_timer    = EventTerm(
-        func=reset_spin_timer,
+    # Track step‐progress
+    reset_step_progress = EventTerm(
+        func=reset_progress_tracker,
         mode="reset",
-        params={"duration": 1.0},  # spin for 1 second
     )
 
-    # 2) reset to your flat spawn pose
-    reset_root_state    = EventTerm(
+    # Track distance progress
+    reset_dist_progress = EventTerm(
+        func=reset_dist_tracker,
+        mode="reset",
+    )
+
+    # Spin‐timer reset
+    reset_spin_timer = EventTerm(
+        func=reset_spin_timer,
+        mode="reset",
+        params={"duration": 1.0},
+    )
+
+    # Root‐state reset
+    reset_root_state = EventTerm(
         func=reset_root_state_new,
         mode="reset",
         params={
@@ -250,20 +258,18 @@ class DriftEventsCfg:
         },
     )
 
-    # 3) clear any turn history
-    clear_turn_buffers  = EventTerm(func=clear_turn_buffers, mode="reset")
+    # Clear turn histories
+    clear_turn_buffers = EventTerm(
+        func=clear_turn_buffers,
+        mode="reset",
+    )
 
-    # 4) finally, while the spin‐timer is active, spin in place
-    spin_in_place       = EventTerm(
+    # Spin in place every step while timer > 0
+    spin_in_place = EventTerm(
         func=spin_in_place,
         mode="interval",
-        # run every sim step:
         interval_range_s=(0.005 * 10, 0.005 * 10),
         params={"max_w": 6.0},
-    )
-    reset_progress = EventTerm(
-        func=reset_dist_tracker,
-        mode="reset",
     )
 
 @configclass
