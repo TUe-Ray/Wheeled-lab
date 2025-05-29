@@ -212,9 +212,10 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 
     # If any env still has timer > 0, push a random yaw to those
     if active:
+        active_ids = torch.tensor(active, device=env.device, dtype=torch.int64)
         mdp.push_by_setting_velocity(
             env,
-            env_ids=active,
+            env_ids=active_ids,
             velocity_range={
                 "x": (0.0, 0.0),
                 "y": (0.0, 0.0),
