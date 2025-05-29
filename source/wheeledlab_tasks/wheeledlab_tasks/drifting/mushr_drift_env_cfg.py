@@ -206,26 +206,36 @@ def random_flat_yaw(env, env_ids, asset_cfg, pos, yaw_range=math.pi):
 
 def enforce_flat(env, env_ids):
     asset = env.scene["robot"]
-    # read current pose
-    state = asset.read_root_pose(env_ids)        # (N×7) [x,y,z,qx,qy,qz,qw]
-    pos, quat = state[..., :3], state[..., 3:]
-    # compute yaw from quat
+
+    # 1) read current root‐state: positions + quaternions
+    #    get_world_poses() returns a (num_envs, 7) tensor [x,y,z,qx,qy,qz,qw]
+    all_states = asset.get_world_poses()              # shape (N_total, 7)
+    state = all_states[env_ids]                      # select only the resetting envs
+
+    pos  = state[..., :3]                            # (N,3)
+    quat = state[..., 3:]                            # (N,4)
+
+    # 2) extract yaw from (qx,qy,qz,qw)
     z, w = quat[..., 2], quat[..., 3]
-    yaw = torch.atan2(2*(w*z), 1 - 2*(z*z))
-    half = yaw * 0.5
-    flat_q = torch.stack([
+    yaw = torch.atan2(2 * (w * z), 1 - 2 * (z * z))
+
+    # 3) rebuild “flat” quaternion [0, 0, sin(yaw/2), cos(yaw/2)]
+    half = 0.5 * yaw
+    flat_quat = torch.stack([
         torch.zeros_like(half),  # qx
         torch.zeros_like(half),  # qy
         torch.sin(half),         # qz
         torch.cos(half)          # qw
     ], dim=-1)
-    # write back pose + zero velocity
-    new_state = torch.cat([pos, flat_q], dim=-1)
+
+    # 4) write it back, zeroing velocity
+    new_state = torch.cat([pos, flat_quat], dim=-1)  # (N,7)
     asset.write_root_pose_to_sim(new_state, env_ids=env_ids)
     asset.write_root_velocity_to_sim(
-        torch.zeros((len(env_ids),6), device=env.device),
+        torch.zeros((len(env_ids), 6), device=env.device),
         env_ids=env_ids
     )
+
     return torch.zeros(env.num_envs, device=env.device)
 
 
