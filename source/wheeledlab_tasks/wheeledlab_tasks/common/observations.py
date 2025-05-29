@@ -68,3 +68,36 @@ class BlindObsCfg:
             self.enable_corruption = False
 
     policy: PolicyCfg = PolicyCfg()
+
+
+@configclass
+class NavObsCfg:
+    """Give the policy x,y position + orientation + velocities."""
+
+    @configclass
+    class PolicyCfg(ObsGroup):
+
+        root_pos_w_term = ObsTerm(
+            func=mdp.root_pos_w,
+            noise=None,
+        )
+
+        root_euler_xyz_term = ObsTerm(
+            func=root_euler_xyz,
+            noise=None,
+        )
+
+        base_lin_vel_term = ObsTerm(
+            func=mdp.base_lin_vel,
+            noise=Gnoise(mean=0., std=0.5),
+        )
+        base_ang_vel_term = ObsTerm(
+            func=mdp.base_ang_vel,
+            noise=Gnoise(std=0.4),
+        )
+
+        def __post_init__(self):
+            self.concatenate_terms = True
+            self.enable_corruption = False
+
+    policy: PolicyCfg = PolicyCfg()
