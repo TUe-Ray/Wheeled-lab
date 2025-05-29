@@ -591,7 +591,7 @@ class MushrDriftPlayEnvCfg(MushrDriftRLEnvCfg):
     """no terminations"""
 
     events: DriftEventsCfg = DriftEventsRandomCfg(
-        random_spawn_reset = EventTerm(
+        reset_random_orientation = EventTerm(
             func=reset_root_state_along_track,
             params={
                 "dist_noise": 0.,
