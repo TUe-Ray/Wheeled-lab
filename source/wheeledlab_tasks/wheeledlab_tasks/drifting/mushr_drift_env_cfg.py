@@ -189,56 +189,52 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 def euler_to_quat(roll: torch.Tensor,
                   pitch: torch.Tensor,
                   yaw: torch.Tensor) -> torch.Tensor:
-    """
-    roll, pitch, yaw: each a (N,) tensor in radians
-    returns (N,4) tensor of [qx,qy,qz,qw]
-    """
-    cr = torch.cos(roll * 0.5)
-    sr = torch.sin(roll * 0.5)
-    cp = torch.cos(pitch * 0.5)
-    sp = torch.sin(pitch * 0.5)
-    cy = torch.cos(yaw * 0.5)
-    sy = torch.sin(yaw * 0.5)
+    cr = torch.cos(roll * 0.5); sr = torch.sin(roll * 0.5)
+    cp = torch.cos(pitch * 0.5); sp = torch.sin(pitch * 0.5)
+    cy = torch.cos(yaw * 0.5); sy = torch.sin(yaw * 0.5)
 
     qw = cr * cp * cy + sr * sp * sy
     qx = sr * cp * cy - cr * sp * sy
     qy = cr * sp * cy + sr * cp * sy
     qz = cr * cp * sy - sr * sp * cy
 
-    return torch.stack([qx, qy, qz, qw], dim=-1)
+    quat = torch.stack([qx, qy, qz, qw], dim=-1)
+    # normalize to unit length
+    return quat / quat.norm(dim=-1, keepdim=True)
 
 def random_yaw_reset(env, env_ids,
                      asset_cfg: SceneEntityCfg,
                      pos: list[float],
                      yaw_range: float = math.pi):
-    # determine N
+    # 1) figure out how many envs are being reset
     if isinstance(env_ids, slice):
-        N = env.num_envs
-    elif hasattr(env_ids, "tolist"):
-        N = len(env_ids.tolist())
+        # e.g. slice(0, 1024) → 1024
+        N = env_ids.stop - env_ids.start
     else:
-        N = int(env_ids)
+        N = env_ids.numel() if hasattr(env_ids, "numel") else len(env_ids)
 
-    # 1) position tensor [N×3]
-    pos_t = torch.tensor(pos, device=env.device).view(1,3).repeat(N,1)
+    device = env.device
 
-    # 2) sample yaw ∈ [–yaw_range, +yaw_range]
-    yaw = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
+    # 2) build position tensor [N x 3]
+    pos_t = torch.tensor(pos, device=device, dtype=torch.float32)
+    pos_t = pos_t.view(1, 3).repeat(N, 1)
+
+    # 3) sample random yaw for each env
+    yaw = (torch.rand(N, device=device) * 2 - 1) * yaw_range
     zero = torch.zeros_like(yaw)
+    quat = euler_to_quat(zero, zero, yaw)  # [N x 4], now unit quaternions
 
-    # 3) convert to quaternion [N×4]
-    quat = euler_to_quat(zero, zero, yaw)
-
-    # 4) write state
+    # 4) write the new root pose
     asset = env.scene[asset_cfg.name]
-    root_state = torch.cat([pos_t, quat], dim=-1)  # [N×7]
+    root_state = torch.cat([pos_t, quat], dim=-1)  # [N x 7]
     asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
-    asset.write_root_velocity_to_sim(
-        torch.zeros((N,6), device=env.device),
-        env_ids=env_ids,
-    )
 
-    return torch.zeros(env.num_envs, device=env.device)
+    # 5) zero out all root velocities (linear + angular)
+    zero_vel = torch.zeros((N, 6), device=device, dtype=torch.float32)
+    asset.write_root_velocity_to_sim(zero_vel, env_ids=env_ids)
+
+    # return dummy tensor so IsaacLab is happy
+    return torch.zeros(env.num_envs, device=device)
 
 @configclass
 class DriftEventsCfg:
@@ -435,7 +431,7 @@ class TraverseABCfg:
 
     # keep your alive and reach terms if you want
     alive = RewTerm(func=mdp.rewards.is_alive, weight=1.0)
-    reach = RewTerm(func=goal_reached_reward, weight=50.0)
+    reach = RewTerm(func=goal_reached_reward, weight=500.0)
 
     # sustained turns (as before)
     sustained_turn = RewTerm(
@@ -461,7 +457,7 @@ class DriftCurriculumCfg:
         params={
             "reward_term_name": "sustained_turn",
             "increase": -100,
-            "episodes_per_increase": 5,
+            "episodes_per_increase": 7,
             "max_increases": 10,
         },
     )
@@ -471,9 +467,9 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "instant_turn",
-            "increase": -100,
-            "episodes_per_increase": 2,
-            "max_increases": 10,
+            "increase": -200,
+            "episodes_per_increase": 5,
+            "max_increases": 5,
         },
     )
 
