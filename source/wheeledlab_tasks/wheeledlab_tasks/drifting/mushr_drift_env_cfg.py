@@ -335,83 +335,88 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 ###### REWARDS #######
 ######################
 
-_turn_buffers = None
-_buf_params = (None, None)
+W_MAX = 6.0    # max |yaw rate| (rad/s)
+V_MAX = 3.0    # max linear speed (m/s)
+D_MAX = (5.0**2 + 5.0**2)**0.5  # ≈7.07 m
 
-def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.1):
+_turn_buffers = None
+_buf_params    = (None, None)
+
+def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.1):
     global _turn_buffers, _buf_params
 
-    dt = env.cfg.sim.dt * env.cfg.decimation
-    window_steps= int(window_s)
+    # how many steps in window_s seconds
+    dt = env.cfg.sim.dt * env.decimation
+    window_steps = max(1, int(window_s / dt))
     N = env.num_envs
 
-    # re‐initialize if dims or window changed
+    # init or resize buffers
     if _turn_buffers is None or _buf_params != (window_steps, N):
         _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-        _buf_params = (window_steps, N)
+        _buf_params    = (window_steps, N)
 
     out = torch.zeros(N, device=env.device)
-    w = mdp.base_ang_vel(env)[..., 2]  # yaw‐rate
+    w   = mdp.base_ang_vel(env)[..., 2].abs().clamp(max=W_MAX)
 
     for i in range(N):
         buf = _turn_buffers[i]
         buf.append(float(w[i].cpu()))
         if len(buf) == buf.maxlen:
             avg_w = sum(buf) / buf.maxlen
-            if abs(avg_w) > tr:
-                out[i] = abs(avg_w)
-    print("sustained turn reward", out)
-    return out
+            if avg_w > tr:
+                # normalize [tr..W_MAX] → [0..1]
+                val = (avg_w - tr) / (W_MAX - tr)
+                out[i] = val
 
-# ────────────────────────────────────────────────────────────────────────────
-# 2) REWARD FOR MOVING TOWARD GOAL
-#    (signed projection: + when toward, – when away)
-# ────────────────────────────────────────────────────────────────────────────
+    print("sustained turn reward (normalized)", out)
+    return out.clamp(0.0, 1.0)
 
-def signed_velocity_toward_goal(env, goal=torch.tensor([5.0, 5.0])):
-    pos = mdp.root_pos_w(env)[..., :2]       # (B,2)
-    vel = mdp.base_lin_vel(env)[..., :2]     # (B,2)
 
-    to_goal = goal.to(env.device) - pos
+def instant_turn_reward(env, scale: float = 1.0):
+    w = mdp.base_ang_vel(env)[..., 2].abs().clamp(max=W_MAX)
+    out = (w / W_MAX) * scale
+    print("instant turn reward (normalized)", out)
+    return out.clamp(0.0, 1.0)
+
+
+def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
+    pos = mdp.root_pos_w(env)[..., :2]
+    vel = mdp.base_lin_vel(env)[..., :2]
+
+    to_goal      = goal.to(env.device) - pos
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
 
-    speed = torch.norm(vel, dim=-1)
+    speed    = torch.norm(vel, dim=-1).clamp(max=V_MAX)
     vel_norm = torch.nn.functional.normalize(vel + 1e-6, dim=-1)
-    cosine = (vel_norm * to_goal_norm).sum(dim=-1)
+    cosine   = (vel_norm * to_goal_norm).sum(dim=-1).clamp(-1.0,1.0)
 
-    # positive if toward, negative if away
-    print("signed velocity toward goal", speed*cosine)
-    return speed * cosine
+    out = (speed * cosine) / V_MAX
+    print("signed velocity toward goal (normalized)", out)
+    return out.clamp(-1.0, 1.0)
 
-# ────────────────────────────────────────────────────────────────────────────
-# 3) PENALTY FOR MOVING AWAY OR STANDING STILL FAR FROM GOAL
-#    a) Away‐movement penalty (only when projection < 0)
-#    b) Distance penalty (scaled distance from goal)
-# ────────────────────────────────────────────────────────────────────────────
 
-def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
-    pos = mdp.root_pos_w(env)[..., :2]
+def away_movement_penalty(env, goal=torch.tensor([5.0,5.0])):
+    proj = signed_velocity_toward_goal(env, goal=goal) * V_MAX
+    raw  = torch.clamp(-proj, min=0.0)
+    out  = raw / V_MAX
+    print("away movement penalty (normalized)", out)
+    return out.clamp(0.0, 1.0)
+
+
+def distance_penalty(env, goal=torch.tensor([5.0,5.0])):
+    pos  = mdp.root_pos_w(env)[..., :2]
+    dist = torch.norm(goal.to(env.device) - pos, dim=-1).clamp(max=D_MAX)
+    out  = -(dist / D_MAX)
+    print("distance penalty (normalized)", out)
+    return out.clamp(-1.0, 0.0)
+
+
+def goal_reached_reward(env, goal=torch.tensor([5.0,5.0]), threshold=0.3):
+    pos  = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
-    return torch.where(dist < threshold, 10.0, 0.0)
-
-def away_movement_penalty(env, goal=torch.tensor([5.0, 5.0])):
-    # clamp negative projections, zero otherwise
-    proj = signed_velocity_toward_goal(env, goal=goal)
-    print("away movement penalty", torch.clamp(-proj, min=0.0))
-    return torch.clamp(-proj, min=0.0)
-
-def distance_penalty(env, goal=torch.tensor([5.0, 5.0])):
-    # straight‐line distance, penalize being far
-    pos = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    print("distance penalty", dist)
-    return -dist
-
-def instant_turn_reward(env, scale=0.1):
-    w = mdp.base_ang_vel(env)[..., 2].abs()
-    print("instant turn reward", mdp.base_ang_vel(env)[..., 2].abs())
-    return w * scale
+    out  = torch.where(dist < threshold, 1.0, 0.0)
+    print("goal reached reward", out)
+    return out
 
 @configclass
 class TraverseABCfg:
