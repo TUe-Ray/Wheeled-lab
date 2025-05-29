@@ -40,8 +40,9 @@ def wheel_encoder(env, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")):
     """
     robot = env.scene[asset_cfg.name]               # Articulation
     # match the actual throttle joint names on your robot
-    left_ids, _  = robot.find_joints([".*left_wheel_throttle"])
-    right_ids, _ = robot.find_joints([".*right_wheel_throttle"])
+    left_ids, _  = robot.find_joints(["left_.*_wheel_joint"])
+    right_ids, _ = robot.find_joints(["right_.*_wheel_joint"])
+
     # joint_vel is (N_envs, n_joints)
     joint_vel = robot.data.joint_vel               # rad/s
     # convert from rad/s → m/s: v = ω * r
