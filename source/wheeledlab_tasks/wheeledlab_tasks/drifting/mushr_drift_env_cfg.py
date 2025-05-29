@@ -368,14 +368,12 @@ def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.1):
                 val = (avg_w - tr) / (W_MAX - tr)
                 out[i] = val
 
-    print("sustained turn reward (normalized)", out)
     return out.clamp(0.0, 1.0)
 
 
 def instant_turn_reward(env, scale: float = 1.0):
     w = mdp.base_ang_vel(env)[..., 2].abs().clamp(max=W_MAX)
     out = (w / W_MAX) * scale
-    print("instant turn reward (normalized)", out)
     return out.clamp(0.0, 1.0)
 
 
@@ -391,7 +389,6 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     cosine   = (vel_norm * to_goal_norm).sum(dim=-1).clamp(-1.0,1.0)
 
     out = (speed * cosine) / V_MAX
-    print("signed velocity toward goal (normalized)", out)
     return out.clamp(-1.0, 1.0)
 
 
@@ -399,23 +396,20 @@ def away_movement_penalty(env, goal=torch.tensor([5.0,5.0])):
     proj = signed_velocity_toward_goal(env, goal=goal) * V_MAX
     raw  = torch.clamp(-proj, min=0.0)
     out  = raw / V_MAX
-    print("away movement penalty (normalized)", out)
     return out.clamp(0.0, 1.0)
 
 
 def distance_penalty(env, goal=torch.tensor([5.0,5.0])):
-    pos  = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1).clamp(max=D_MAX)
-    out  = -(dist / D_MAX)
-    print("distance penalty (normalized)", out)
-    return out.clamp(-1.0, 0.0)
+    pos  = mdp.root_pos_w(env)[...,:2]
+    dist = torch.norm(goal.to(env.device)-pos, dim=-1).clamp(max=D_MAX)
+    # normalize [0..D_MAX] → [1..0]
+    return (1.0 - dist/D_MAX).clamp(0.0, 1.0)
 
 
 def goal_reached_reward(env, goal=torch.tensor([5.0,5.0]), threshold=0.3):
     pos  = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     out  = torch.where(dist < threshold, 1.0, 0.0)
-    print("goal reached reward", out)
     return out
 
 @configclass
@@ -430,13 +424,13 @@ class TraverseABCfg:
     # penalize any movement away
     away_penalty = RewTerm(
         func=away_movement_penalty,
-        weight=100000.0,
+        weight=3,
     )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=0.1,
+        weight=2,
     )
 
     # keep your alive and reach terms if you want
@@ -446,12 +440,12 @@ class TraverseABCfg:
     # sustained turns (as before)
     sustained_turn = RewTerm(
         func=sustained_turn_reward,
-        weight=900005.0,
+        weight=1005,
     )
     instant_turn = RewTerm(
     func=instant_turn_reward,
     params={"scale": 0.05},
-    weight=1000,
+    weight=10005,
 )
 
 
@@ -466,8 +460,8 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
-            "increase": -90000,
-            "episodes_per_increase": 4,
+            "increase": -100,
+            "episodes_per_increase": 5,
             "max_increases": 10,
         },
     )
@@ -477,7 +471,7 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "instant_turn",
-            "increase": -10,
+            "increase": -100,
             "episodes_per_increase": 2,
             "max_increases": 10,
         },
