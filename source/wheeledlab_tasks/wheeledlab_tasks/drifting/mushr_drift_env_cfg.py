@@ -5,7 +5,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.terrains import TerrainImporterCfg
-from isaaclab.utils import configclass
+from isaaclab.utils import configclass, quat_from_euler
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg
@@ -185,36 +185,65 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 ###### EVENTS #######
 #####################
 
+def random_yaw_reset(env, env_ids,
+                     asset_cfg: SceneEntityCfg,
+                     pos: list[float],
+                     yaw_range: float = math.pi):
+    """
+    env_ids: Tensor of indices to reset this call
+    asset_cfg: must match your robot
+    pos: fixed [x,y,z] start
+    yaw_range: max absolute yaw to sample (i.e ±yaw_range)
+    """
+    # number of envs being reset
+    if hasattr(env_ids, "tolist"):
+        N = len(env_ids.tolist())
+    else:
+        N = int(env_ids.stop - env_ids.start)  if isinstance(env_ids, slice) else env.num_envs
+
+    # 1) build position tensor [N×3]
+    pos_t = (
+        torch.tensor(pos, device=env.device)
+             .view(1,3)
+             .repeat(N,1)
+    )
+
+    # 2) sample random yaw ∈ [–yaw_range, +yaw_range]
+    yaws = (torch.rand(N, device=env.device) * 2 - 1) * yaw_range
+    zeros = torch.zeros_like(yaws)
+
+    # 3) convert to quaternion [N×4]
+    quat = quat_from_euler(
+        torch.stack([zeros, zeros, yaws], dim=-1)
+    )  # returns [N×4] in (x,y,z,w) order
+
+    # 4) write into sim
+    asset = env.scene[asset_cfg.name]
+    root_state = torch.cat([pos_t, quat], dim=-1)  # [N×7]
+    asset.write_root_pose_to_sim(root_state, env_ids=env_ids)
+    asset.write_root_velocity_to_sim(
+        torch.zeros((N,6), device=env.device), env_ids=env_ids
+    )
+
+    # IsaacLab expects a Tensor return (even if you ignore it)
+    return torch.zeros(env.num_envs, device=env.device)
+
+
 @configclass
 class DriftEventsCfg:
-    # on startup
-
-#    reset_root_state = EventTerm(
-#        func=reset_root_state_along_track,
-#        params={
-#            "track_radius": LINE_RADIUS,
-#            "track_straight_dist": STRAIGHT,
-#            "num_points": 20,
-#            "pos_noise": 0.5,
-#            "yaw_noise": 1.0,
-#            "asset_cfg": SceneEntityCfg("robot"),
-#        },
-#        mode="reset",
-#    )
-
 
     reset_progress = EventTerm(
         func=reset_progress_tracker,
         mode="reset",
     )
-    reset_root_state = EventTerm(
-        func=reset_root_state_new,
+    reset_random_yaw = EventTerm(
+        func=random_yaw_reset,
+        mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2, -3, 0.0],    # ← your desired start-point A
-            "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
+            "pos": [-2.0, -3.0, 0.0],
+            "yaw_range": math.pi,   # +/-180° each episode
         },
-        mode="reset",
     )
     clear_turn = EventTerm(
         func=clear_turn_buffers,
@@ -320,6 +349,7 @@ def sustained_turn_reward(env, window_s: float = 10.0, tr: float = 0.1):
             avg_w = sum(buf) / buf.maxlen
             if abs(avg_w) > tr:
                 out[i] = abs(avg_w)
+    print("sustained turn reward", out)
     return out
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -339,6 +369,7 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([5.0, 5.0])):
     cosine = (vel_norm * to_goal_norm).sum(dim=-1)
 
     # positive if toward, negative if away
+    print("signed velocity toward goal", speed*cosine)
     return speed * cosine
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -350,22 +381,25 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([5.0, 5.0])):
 def goal_reached_reward(env, goal=torch.tensor([5.0, 5.0]), threshold=0.3):
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    #print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
+    print("Goal reached reward:", torch.where(dist < threshold, 10.0, 0.0) )
     return torch.where(dist < threshold, 10.0, 0.0)
 
 def away_movement_penalty(env, goal=torch.tensor([5.0, 5.0])):
     # clamp negative projections, zero otherwise
     proj = signed_velocity_toward_goal(env, goal=goal)
+    print("away movement penalty", torch.clamp(-proj, min=0.0))
     return torch.clamp(-proj, min=0.0)
 
 def distance_penalty(env, goal=torch.tensor([5.0, 5.0])):
     # straight‐line distance, penalize being far
     pos = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
+    print("distance penalty", dist)
     return -dist
 
 def instant_turn_reward(env, scale=0.1):
     w = mdp.base_ang_vel(env)[..., 2].abs()
+    print("instant turn reward", mdp.base_ang_vel(env)[..., 2].abs())
     return w * scale
 
 @configclass
@@ -380,13 +414,13 @@ class TraverseABCfg:
     # penalize any movement away
     away_penalty = RewTerm(
         func=away_movement_penalty,
-        weight=1000.0,
+        weight=100000.0,
     )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=0.001,
+        weight=0.1,
     )
 
     # keep your alive and reach terms if you want
@@ -396,7 +430,7 @@ class TraverseABCfg:
     # sustained turns (as before)
     sustained_turn = RewTerm(
         func=sustained_turn_reward,
-        weight=9005.0,
+        weight=900005.0,
     )
     instant_turn = RewTerm(
     func=instant_turn_reward,
@@ -416,11 +450,23 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "sustained_turn",
-            "increase": -900,
+            "increase": -90000,
             "episodes_per_increase": 4,
             "max_increases": 10,
         },
     )
+
+    # Every 20 eps reduce the alignment reward by 4, up to 5 times (20→0)
+    decay_turn = CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "instant_turn",
+            "increase": -10,
+            "episodes_per_increase": 2,
+            "max_increases": 10,
+        },
+    )
+
 
 
 ##########################
