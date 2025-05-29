@@ -276,8 +276,8 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_rigid_body_material,
         mode="startup",
         params={
-            "static_friction_range": (0.3, 0.5),
-            "dynamic_friction_range": (0.3, 0.5),
+            "static_friction_range": (0.6, 0.7),
+            "dynamic_friction_range": (0.4, 0.5),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
             "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"), #body_names=".*wheel_link"),
@@ -290,7 +290,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_wheel_joint"]), #oint_names=[".*back.*throttle"]),  #
-            "damping_distribution_params": (10.0, 50.0),
+            "damping_distribution_params": (10.0, 15.0),
             "operation": "abs",
         },
     )
@@ -298,7 +298,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
     push_robots_hf = EventTerm( # High frequency small pushes
         func=mdp.push_by_setting_velocity,
         mode="interval",
-        interval_range_s=(0.1, 0.4),
+        interval_range_s=(1, 4),
         params={
             "velocity_range":{
                 "x": (-0.1, 0.1),
@@ -323,7 +323,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot",  body_names=["main_body"]), #body_names=["base_link"]), #
-            "mass_distribution_params": (0.3, 0.5),
+            "mass_distribution_params": (0.1, 0.2),
             "operation": "add",
             "distribution": "uniform",
         },

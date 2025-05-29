@@ -7,7 +7,7 @@ from isaaclab.actuators import IdealPDActuatorCfg
 
 # Optional: adjust if you have a constants file for radius
 WHEEL_RADIUS = 0.1175
-MAX_WHEEL_SPEED = 20.0  # [m/s] or whatever your robot supports
+MAX_WHEEL_SPEED = 2  # [m/s] or whatever your robot supports
 
 OriginRobotCfg = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
@@ -29,9 +29,9 @@ OriginRobotCfg = ArticulationCfg(
     actuators={
         "wheel_act": IdealPDActuatorCfg(
             joint_names_expr=[".*_wheel_joint"],
-            stiffness=3.0,
-            damping=60.0,
-            effort_limit=20.0,
+            stiffness=50,
+            damping=5,
+            effort_limit=10.0,
             velocity_limit=MAX_WHEEL_SPEED / WHEEL_RADIUS,
         )
     },
