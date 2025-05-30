@@ -1,5 +1,20 @@
 import torch
+import numpy as np
+import isaacsim.core.utils.prims as prim_utils
+from itertools import product
 
+def spawn_env_grid(n_envs=1024, span=8.0):
+    grid = int(np.sqrt(n_envs))
+    xs = np.linspace(-span, span, grid)
+    ys = np.linspace(-span, span, grid)
+    for idx, (x, y) in enumerate(product(xs, ys)):
+        prim_utils.create_prim(
+            prim_path=f"/World/envs/env_{idx}",
+            prim_type="Xform",
+            translation=[x, y, 0.0],
+        )
+
+spawn_env_grid(1024, 8.0)
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
