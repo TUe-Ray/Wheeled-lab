@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import isaacsim.core.utils.prims as prim_utils
 from itertools import product
-
+import random
 def spawn_env_grid(n_envs=1024, span=8.0):
     grid = int(np.sqrt(n_envs))
     xs = np.linspace(-span, span, grid)
