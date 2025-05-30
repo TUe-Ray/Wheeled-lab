@@ -3,18 +3,18 @@ import numpy as np
 import isaacsim.core.utils.prims as prim_utils
 from itertools import product
 import random
-def spawn_env_grid(n_envs=1024, span=8.0):
-    grid = int(np.sqrt(n_envs))
-    xs = np.linspace(-span, span, grid)
-    ys = np.linspace(-span, span, grid)
-    for idx, (x, y) in enumerate(product(xs, ys)):
-        prim_utils.create_prim(
-            prim_path=f"/World/envs/env_{idx}",
-            prim_type="Xform",
-            translation=[x, y, 0.0],
-        )
+# def spawn_env_grid(n_envs=1024, span=8.0):
+#     grid = int(np.sqrt(n_envs))
+#     xs = np.linspace(-span, span, grid)
+#     ys = np.linspace(-span, span, grid)
+#     for idx, (x, y) in enumerate(product(xs, ys)):
+#         prim_utils.create_prim(
+#             prim_path=f"/World/envs/env_{idx}",
+#             prim_type="Xform",
+#             translation=[x, y, 0.0],
+#         )
 
-spawn_env_grid(10, 8.0)
+# spawn_env_grid(10, 8.0)
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -31,6 +31,7 @@ from isaaclab.managers import (
     TerminationTermCfg as DoneTerm,
     SceneEntityCfg,
 )
+from isaaclab.terrains import MeshRepeatedObjectsTerrainCfg
 from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
@@ -144,7 +145,25 @@ class DriftTerrainImporterCfg(TerrainImporterCfg):
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-    terrain = DriftTerrainImporterCfg()
+    terrain = DriftTerrainImporterCfg(
+        mesh_terrain=MeshRepeatedObjectsTerrainCfg(
+            size=(16.0, 16.0),
+            platform_width=2.0,
+            object_type="box",
+            object_params_start={
+                "num_objects": 1,
+                "size": (0.3, 0.3),
+                "max_yx_angle": 0.0,
+                "degrees": 0,
+            },
+            object_params_end={
+                "num_objects": 5,
+                "size": (0.5, 0.5),
+                "max_yx_angle": 45.0,
+                "degrees": 360,
+            },
+        )
+    )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     goal_marker = AssetBaseCfg(
@@ -152,14 +171,6 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         init_state=AssetBaseCfg.InitialStateCfg(pos=[5.0, 5.0, 0.0]),
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
-    )
-    obstacle1: AssetBaseCfg = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle1",
-        spawn=XFormPrimCfg(),   # ← the correct “empty XForm” spawner
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[3.0, 0.0, 0.5],
-            rot=[1.0, 0.0, 0.0, 0.0],
-        ),
     )
     # four walls at ±8
     wall_north = AssetBaseCfg(
@@ -205,7 +216,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         offset=RayCasterCfg.OffsetCfg(pos=(0.0,0.0,0.5)),
         attach_yaw_only=False,
         mesh_prim_paths=[
-            "/World/envs/env_.*/Obstacle1",
+         "/World/envs/env_.*/ground(/.*)?",
             "/World/envs/env_.*/wall_north",
             "/World/envs/env_.*/wall_south",
             "/World/envs/env_.*/wall_east",
