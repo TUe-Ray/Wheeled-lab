@@ -158,15 +158,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             "num_objects": 5, "size": (0.5, 0.5),
             "max_yx_angle": 45.0, "degrees": 360,
         },
-        # collision + physics props live here:
-        collision_group=-1,
-        physics_material=sim_utils.RigidBodyMaterialCfg(
-            friction_combine_mode="multiply",
-            restitution_combine_mode="multiply",
-            static_friction=1.1,
-            dynamic_friction=1.0,
-        ),
-        debug_vis=False,
+        # collision + physics props live here
     )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
