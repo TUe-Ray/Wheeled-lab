@@ -201,10 +201,8 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             "/World/envs/env_.*//Obstacle1",
             "/World/envs/env_.*//Wall_.*",
         ],
-        # enable dynamic multi-mesh logic from PR #1886
-        dynamic_meshes=True,
-        # disable the old per-beam warp (you really only want it for static, pre-warped meshes)
-        per_beam_warp=False,
+
+
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
             vertical_fov_range=(-15.0, -15.0),
@@ -218,6 +216,25 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     def __post_init__(self):
         """Post intialization."""
         super().__post_init__()
+        # spawn your walls as four thin cuboids around the −8…+8 square:
+        for name, (px, py, sx, sy) in {
+            "wall_north": (0.0, +8.0, 16.0, 0.2),
+            "wall_south": (0.0, -8.0, 16.0, 0.2),
+            "wall_east":  (+8.0,  0.0, 0.2, 16.0),
+            "wall_west":  (-8.0,  0.0, 0.2, 16.0),
+        }.items():
+            prim = f"{self.env_regex_ns}/{name}"
+            sim_utils.MeshCuboidCfg(
+                size=(sx, sy, 1.0),
+                collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+                visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5)),
+            ).func(
+                prim_path=prim,
+                cfg=None,
+                translation=(px, py, 0.5),
+                orientation=(1.0, 0.0, 0.0, 0.0),
+            )
+
         self.robot.init_state = self.robot.init_state.replace(
             pos=(0.0, 0.0, 0.0),
         )
