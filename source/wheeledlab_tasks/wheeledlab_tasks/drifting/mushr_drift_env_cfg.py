@@ -31,7 +31,7 @@ from isaaclab.managers import (
     TerminationTermCfg as DoneTerm,
     SceneEntityCfg,
 )
-from isaaclab.terrains.mesh_terrains_cfg import MeshRepeatedObjectsTerrainCfg
+from isaaclab.terrains.trimesh.mesh_terrains_cfg import MeshRepeatedObjectsTerrainCfg
 
 from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
