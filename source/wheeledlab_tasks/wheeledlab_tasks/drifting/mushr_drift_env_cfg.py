@@ -155,13 +155,12 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
     obstacle1: AssetBaseCfg = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
-        spawn=sim_utils.TransformPrimCfg(),
+        spawn=XFormPrimCfg(),   # ← the correct “empty XForm” spawner
         init_state=AssetBaseCfg.InitialStateCfg(
             pos=[3.0, 0.0, 0.5],
             rot=[1.0, 0.0, 0.0, 0.0],
         ),
     )
-
     # four walls at ±8
     wall_north = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
