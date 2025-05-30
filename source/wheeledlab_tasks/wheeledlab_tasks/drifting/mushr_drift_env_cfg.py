@@ -182,11 +182,11 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         offset=RayCasterCfg.OffsetCfg(pos=(0.0,0.0,0.5)),
         attach_yaw_only=False,
         mesh_prim_paths=[
-            "/World/envs/env_*/Obstacle1",
-            "/World/envs/env_*/wall_north",
-            "/World/envs/env_*/wall_south",
-            "/World/envs/env_*/wall_east",
-            "/World/envs/env_*/wall_west",
+            "/World/envs/env_.*/Obstacle1",
+            "/World/envs/env_.*/wall_north",
+            "/World/envs/env_.*/wall_south",
+            "/World/envs/env_.*/wall_east",
+            "/World/envs/env_.*/wall_west",
         ],
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
