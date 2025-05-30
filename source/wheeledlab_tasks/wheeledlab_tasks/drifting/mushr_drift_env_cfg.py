@@ -14,7 +14,7 @@ def spawn_env_grid(n_envs=1024, span=8.0):
             translation=[x, y, 0.0],
         )
 
-spawn_env_grid(1024, 8.0)
+spawn_env_grid(10, 8.0)
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
