@@ -39,6 +39,7 @@ from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from .mdp import reset_root_state_along_track, reset_root_state_new
 from functools import partial
 import math 
+from isaaclab.sim.spawners.xform_prim import XFormPrimCfg
 ##############################
 ###### COMMON CONSTANTS ######
 ##############################
