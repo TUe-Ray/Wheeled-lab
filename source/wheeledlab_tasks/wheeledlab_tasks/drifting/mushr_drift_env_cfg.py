@@ -39,7 +39,6 @@ from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from .mdp import reset_root_state_along_track, reset_root_state_new
 from functools import partial
 import math 
-from isaaclab.sim.spawners.xform_prim import XFormPrimCfg
 ##############################
 ###### COMMON CONSTANTS ######
 ##############################
@@ -271,141 +270,141 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
         )
 
     return torch.zeros(env.num_envs, device=env.device)
-import omni.usd
-from pxr import Usd
+# import omni.usd
+# from pxr import Usd
 
-def randomize_obstacle_size(env, env_ids, size_range=(0.5, 2.0)):
-    # grab the live stage exactly as the multi_asset.py demo does
-    stage = omni.usd.get_context().get_stage()
+# def randomize_obstacle_size(env, env_ids, size_range=(0.5, 2.0)):
+#     # grab the live stage exactly as the multi_asset.py demo does
+#     stage = omni.usd.get_context().get_stage()
 
-    for i in env_ids.tolist():
-        # compute your cuboid size…
-        prim_path = f"/World/envs/env_{i}/Obstacle1"
+#     for i in env_ids.tolist():
+#         # compute your cuboid size…
+#         prim_path = f"/World/envs/env_{i}/Obstacle1"
 
-        # ─── remove any old obstacle ───
-        if stage.GetPrimAtPath(prim_path):
-            stage.RemovePrim(prim_path)        # sample x,y,z half‐extents
-        sx = random.uniform(*size_range)
-        sy = random.uniform(*size_range)
-        sz = random.uniform(*size_range)
+#         # ─── remove any old obstacle ───
+#         if stage.GetPrimAtPath(prim_path):
+#             stage.RemovePrim(prim_path)        # sample x,y,z half‐extents
+#         sx = random.uniform(*size_range)
+#         sy = random.uniform(*size_range)
+#         sz = random.uniform(*size_range)
 
-        # make a new spawn‐cfg
-        spawn_cfg = MeshCuboidCfg(
-            size=(sx, sy, sz),
-            collision_props=sim_utils.CollisionPropertiesCfg(
-                contact_offset=0.01,
-                rest_offset=0.0,
-            ),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
-        )
+#         # make a new spawn‐cfg
+#         spawn_cfg = MeshCuboidCfg(
+#             size=(sx, sy, sz),
+#             collision_props=sim_utils.CollisionPropertiesCfg(
+#                 contact_offset=0.01,
+#                 rest_offset=0.0,
+#             ),
+#             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+#         )
 
-        # full prim path for that env
-        prim = f"/World/envs/env_{i}/Obstacle1"
-        # spawn it half‐buried so it sits on the ground
-        spawn_cfg.func(
-            prim,
-            spawn_cfg,
-            translation=[3.0, 0.0, sz * 0.5],
-            orientation=[1.0, 0.0, 0.0, 0.0],
-        )
-    return torch.zeros(env.num_envs, device=env.device)
-from pxr import Gf, UsdGeom
-from isaaclab.sim.spawners.xform_prim import XFormPrim
+#         # full prim path for that env
+#         prim = f"/World/envs/env_{i}/Obstacle1"
+#         # spawn it half‐buried so it sits on the ground
+#         spawn_cfg.func(
+#             prim,
+#             spawn_cfg,
+#             translation=[3.0, 0.0, sz * 0.5],
+#             orientation=[1.0, 0.0, 0.0, 0.0],
+#         )
+#     return torch.zeros(env.num_envs, device=env.device)
+# from pxr import Gf, UsdGeom
+# from isaaclab.sim.spawners.xform_prim import XFormPrim
 
-def randomize_obstacle_pose(env, env_ids,
-                            area=(-5,5,-5,5),
-                            min_dist=1.0):
-    """
-    Move /World/envs/env_i/Obstacle1 via its XFormPrim each reset.
-    """
-    stage = env.stage
-    start = torch.tensor([-2.0, -3.0], device=env.device)
-    goal  = torch.tensor([ 5.0,  5.0], device=env.device)
+# def randomize_obstacle_pose(env, env_ids,
+#                             area=(-5,5,-5,5),
+#                             min_dist=1.0):
+#     """
+#     Move /World/envs/env_i/Obstacle1 via its XFormPrim each reset.
+#     """
+#     stage = env.stage
+#     start = torch.tensor([-2.0, -3.0], device=env.device)
+#     goal  = torch.tensor([ 5.0,  5.0], device=env.device)
 
-    for i in env_ids.tolist():
-        # rejection sample in the box
-        while True:
-            x = random.uniform(area[0], area[1])
-            y = random.uniform(area[2], area[3])
-            pt = torch.tensor([x,y], device=env.device)
-            if (torch.norm(pt - start) >= min_dist
-                and torch.norm(pt - goal ) >= min_dist):
-                break
+#     for i in env_ids.tolist():
+#         # rejection sample in the box
+#         while True:
+#             x = random.uniform(area[0], area[1])
+#             y = random.uniform(area[2], area[3])
+#             pt = torch.tensor([x,y], device=env.device)
+#             if (torch.norm(pt - start) >= min_dist
+#                 and torch.norm(pt - goal ) >= min_dist):
+#                 break
 
-        prim_path = f"/World/envs/env_{i}/Obstacle1"
-        xform = XFormPrim(prim_path, stage)
-        xform.set_world_pose(
-            position=[x, y, 0.0],
-            orientation=[1.0, 0.0, 0.0, 0.0],
-            env_ids=[i],
-        )
-    return torch.zeros(env.num_envs, device=env.device)
+#         prim_path = f"/World/envs/env_{i}/Obstacle1"
+#         xform = XFormPrim(prim_path, stage)
+#         xform.set_world_pose(
+#             position=[x, y, 0.0],
+#             orientation=[1.0, 0.0, 0.0, 0.0],
+#             env_ids=[i],
+#         )
+#     return torch.zeros(env.num_envs, device=env.device)
 
 
-def randomize_goal(env, env_ids,
-                   area=(-5,5,-5,5),
-                   min_dist=1.0):
-    """
-    Move /World/envs/env_i/GoalMarker via its XFormPrim each reset.
-    """
-    stage = env.stage
-    # obstacle positions for distance check
-    obs_xform = XFormPrim(f"/World/envs/env_.*/Obstacle1", stage)
-    # we'll re-instantiate per env below
-    for i in env_ids.tolist():
-        # get robot’s freshly‐set start pos
-        rp = env.scene.articulations["robot"].data.root_pos_w[i,:2]
-        obs_pt = obs_xform.get_world_pose(env_ids=[i])[:, :2][0]
+# def randomize_goal(env, env_ids,
+#                    area=(-5,5,-5,5),
+#                    min_dist=1.0):
+#     """
+#     Move /World/envs/env_i/GoalMarker via its XFormPrim each reset.
+#     """
+#     stage = env.stage
+#     # obstacle positions for distance check
+#     obs_xform = XFormPrim(f"/World/envs/env_.*/Obstacle1", stage)
+#     # we'll re-instantiate per env below
+#     for i in env_ids.tolist():
+#         # get robot’s freshly‐set start pos
+#         rp = env.scene.articulations["robot"].data.root_pos_w[i,:2]
+#         obs_pt = obs_xform.get_world_pose(env_ids=[i])[:, :2][0]
 
-        # rejection sample
-        while True:
-            gx = random.uniform(area[0], area[1])
-            gy = random.uniform(area[2], area[3])
-            pt = torch.tensor([gx,gy], device=env.device)
-            if ( (pt - rp    ).norm() >= min_dist
-                 and (pt - obs_pt ).norm() >= min_dist ):
-                break
+#         # rejection sample
+#         while True:
+#             gx = random.uniform(area[0], area[1])
+#             gy = random.uniform(area[2], area[3])
+#             pt = torch.tensor([gx,gy], device=env.device)
+#             if ( (pt - rp    ).norm() >= min_dist
+#                  and (pt - obs_pt ).norm() >= min_dist ):
+#                 break
 
-        prim_path = f"/World/envs/env_{i}/GoalMarker"
-        xform_goal = XFormPrim(prim_path, stage)
-        xform_goal.set_world_pose(
-            position=[gx, gy, 0.0],
-            orientation=[1.0, 0.0, 0.0, 0.0],
-            env_ids=[i],
-        )
-    return torch.zeros(env.num_envs, device=env.device)
+#         prim_path = f"/World/envs/env_{i}/GoalMarker"
+#         xform_goal = XFormPrim(prim_path, stage)
+#         xform_goal.set_world_pose(
+#             position=[gx, gy, 0.0],
+#             orientation=[1.0, 0.0, 0.0, 0.0],
+#             env_ids=[i],
+#         )
+#     return torch.zeros(env.num_envs, device=env.device)
 
-# 3) RANDOMIZE ROBOT START
-def randomize_robot_start(env, env_ids,
-                          area=(-5,5,-5,5),
-                          min_dist=1.0):
-    """
-    Pick a start for each env that’s ≥min_dist from the obstacle and the goal.
-    Uses reset_root_state_new to actually teleport the car.
-    """
-    # get the current obstacle position in each env
-    obs = env.scene.extras["obstacle1"]
-    obs_pos = obs.get_world_pose(env_ids=env_ids)[:, :2]
+# # 3) RANDOMIZE ROBOT START
+# def randomize_robot_start(env, env_ids,
+#                           area=(-5,5,-5,5),
+#                           min_dist=1.0):
+#     """
+#     Pick a start for each env that’s ≥min_dist from the obstacle and the goal.
+#     Uses reset_root_state_new to actually teleport the car.
+#     """
+#     # get the current obstacle position in each env
+#     obs = env.scene.extras["obstacle1"]
+#     obs_pos = obs.get_world_pose(env_ids=env_ids)[:, :2]
 
-    goal = torch.tensor([5.0, 5.0], device=env.device)
-    for i in env_ids.tolist():
-        while True:
-            x = random.uniform(area[0], area[1])
-            y = random.uniform(area[2], area[3])
-            pt = torch.tensor([x,y], device=env.device)
-            if ( (pt - obs_pos[i]).norm() >= min_dist
-                 and (pt - goal    ).norm() >= min_dist ):
-                break
+#     goal = torch.tensor([5.0, 5.0], device=env.device)
+#     for i in env_ids.tolist():
+#         while True:
+#             x = random.uniform(area[0], area[1])
+#             y = random.uniform(area[2], area[3])
+#             pt = torch.tensor([x,y], device=env.device)
+#             if ( (pt - obs_pos[i]).norm() >= min_dist
+#                  and (pt - goal    ).norm() >= min_dist ):
+#                 break
 
-        # teleport it flat + identity yaw
-        reset_root_state_new(
-            env,
-            torch.tensor([i], device=env.device),
-            asset_cfg=SceneEntityCfg("robot"),
-            pos=[x, y, 0.0],
-            rot=[0.0, 0.0, 0.0, 1.0],
-        )
-    return torch.zeros(env.num_envs, device=env.device)
+#         # teleport it flat + identity yaw
+#         reset_root_state_new(
+#             env,
+#             torch.tensor([i], device=env.device),
+#             asset_cfg=SceneEntityCfg("robot"),
+#             pos=[x, y, 0.0],
+#             rot=[0.0, 0.0, 0.0, 1.0],
+#         )
+#     return torch.zeros(env.num_envs, device=env.device)
 
 
 # 4) RANDOMIZE GOAL
@@ -456,21 +455,21 @@ class DriftEventsCfg:
     #     mode="reset",
     #     params={"size_range": (0.5,2.0)},
     # )
-    randomize_obstacle_pose = EventTerm(
-        func=randomize_obstacle_pose,
-        mode="reset",
-        params={"area":(-5,5,-5,5),"min_dist":2},
-    )
-    randomize_robot_start = EventTerm(
-        func=randomize_robot_start,
-        mode="reset",
-        params={"area":(-5,5,-5,5),"min_dist":2},
-    )
-    randomize_goal = EventTerm(
-        func=randomize_goal,
-        mode="reset",
-        params={"area":(-5,5,-5,5),"min_dist":2},
-    )
+    # randomize_obstacle_pose = EventTerm(
+    #     func=randomize_obstacle_pose,
+    #     mode="reset",
+    #     params={"area":(-5,5,-5,5),"min_dist":2},
+    # )
+    # randomize_robot_start = EventTerm(
+    #     func=randomize_robot_start,
+    #     mode="reset",
+    #     params={"area":(-5,5,-5,5),"min_dist":2},
+    # )
+    # randomize_goal = EventTerm(
+    #     func=randomize_goal,
+    #     mode="reset",
+    #     params={"area":(-5,5,-5,5),"min_dist":2},
+    # )
 
 
 @configclass
