@@ -440,11 +440,11 @@ class DriftEventsCfg:
         func=reset_dist_tracker,
         mode="reset",
     )
-    randomize_obstacle_size = EventTerm(
-        func=randomize_obstacle_size,
-        mode="reset",
-        params={"size_range": (0.5,2.0)},
-    )
+    # randomize_obstacle_size = EventTerm(
+    #     func=randomize_obstacle_size,
+    #     mode="reset",
+    #     params={"size_range": (0.5,2.0)},
+    # )
     randomize_obstacle_pose = EventTerm(
         func=randomize_obstacle_pose,
         mode="reset",
