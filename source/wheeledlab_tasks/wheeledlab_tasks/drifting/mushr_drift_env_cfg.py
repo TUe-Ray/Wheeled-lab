@@ -18,7 +18,7 @@ spawn_env_grid(10, 8.0)
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.scene import InteractiveSceneCfg, XFormPrimCfg
+from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
@@ -153,16 +153,15 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    obstacle1: XFormPrimCfg = XFormPrimCfg(
-    prim_path="{ENV_REGEX_NS}/Obstacle1",
-    spawn=sim_utils.TransformPrimCfg(),   # spawn a bare Xform
-    init_state=XFormPrimCfg.InitialStateCfg(
-        # you can optionally give it an initial offset,
-        # or leave it at the world‐origin of each env
-        pos=(3.0, 0.0, 0.5),
-        rot=(1.0, 0.0, 0.0, 0.0),
-    ),
-)
+    obstacle1: AssetBaseCfg = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Obstacle1",
+        spawn=sim_utils.TransformPrimCfg(),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=[3.0, 0.0, 0.5],
+            rot=[1.0, 0.0, 0.0, 0.0],
+        ),
+    )
+
     # four walls at ±8
     wall_north = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
