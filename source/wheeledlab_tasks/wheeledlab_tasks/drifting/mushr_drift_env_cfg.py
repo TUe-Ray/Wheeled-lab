@@ -262,12 +262,20 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
         )
 
     return torch.zeros(env.num_envs, device=env.device)
+import omni.usd
+from pxr import Usd
+
 def randomize_obstacle_size(env, env_ids, size_range=(0.5, 2.0)):
-    """
-    On reset, respawn a fresh Obstacle1 cuboid of random size for each env.
-    """
+    # grab the live stage exactly as the multi_asset.py demo does
+    stage = omni.usd.get_context().get_stage()
+
     for i in env_ids.tolist():
-        # sample x,y,z half‐extents
+        # compute your cuboid size…
+        prim_path = f"/World/envs/env_{i}/Obstacle1"
+
+        # ─── remove any old obstacle ───
+        if stage.GetPrimAtPath(prim_path):
+            stage.RemovePrim(prim_path)        # sample x,y,z half‐extents
         sx = random.uniform(*size_range)
         sy = random.uniform(*size_range)
         sz = random.uniform(*size_range)
