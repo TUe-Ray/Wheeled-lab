@@ -146,24 +146,27 @@ class DriftTerrainImporterCfg(TerrainImporterCfg):
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-    terrain = DriftTerrainImporterCfg(
-        mesh_terrain=MeshRepeatedObjectsTerrainCfg(
-            size=(16.0, 16.0),
-            platform_width=2.0,
-            object_type="box",
-            object_params_start={
-                "num_objects": 1,
-                "size": (0.3, 0.3),
-                "max_yx_angle": 0.0,
-                "degrees": 0,
-            },
-            object_params_end={
-                "num_objects": 5,
-                "size": (0.5, 0.5),
-                "max_yx_angle": 45.0,
-                "degrees": 360,
-            },
-        )
+    terrain = MeshRepeatedObjectsTerrainCfg(
+        size=(16.0, 16.0),
+        platform_width=2.0,
+        object_type="box",
+        object_params_start={
+            "num_objects": 1, "size": (0.3, 0.3),
+            "max_yx_angle": 0.0, "degrees": 0,
+        },
+        object_params_end={
+            "num_objects": 5, "size": (0.5, 0.5),
+            "max_yx_angle": 45.0, "degrees": 360,
+        },
+        # collision + physics props live here:
+        collision_group=-1,
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.1,
+            dynamic_friction=1.0,
+        ),
+        debug_vis=False,
     )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
