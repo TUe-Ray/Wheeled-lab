@@ -135,79 +135,64 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     goal_marker = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/GoalMarker",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[5.0, 5.0, 0.0]),
-        spawn=SphereCfg(
-            radius=0.2,
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
-        ),
+        spawn=SphereCfg(radius=0.2,
+                        visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-
-    # a drifting obstacle
-    obstacle1 = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle1",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0, 0.0, 0.75]),
-        spawn=MeshCuboidCfg(
-            size=(1.5, 1.5, 1.5),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2)),
-        ),
-    )
-
-    # four walls at ±8 m in X/Y forming a big square (z-height 2 m)
+    # four walls at ±8
     wall_north = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_North",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0,  8.0, 1.0]),
+        prim_path="{ENV_REGEX_NS}/wall_north",
         spawn=MeshCuboidCfg(
-            size=(16.0, 0.2, 2.0),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+            size=(16.0, 0.2, 1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
         ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 8.0, 0.5], rot=[1,0,0,0]),
     )
     wall_south = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_South",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -8.0, 1.0]),
+        prim_path="{ENV_REGEX_NS}/wall_south",
         spawn=MeshCuboidCfg(
-            size=(16.0, 0.2, 2.0),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+            size=(16.0, 0.2, 1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
         ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -8.0, 0.5], rot=[1,0,0,0]),
     )
     wall_east = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_East",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[ 8.0, 0.0, 1.0]),
+        prim_path="{ENV_REGEX_NS}/wall_east",
         spawn=MeshCuboidCfg(
-            size=(0.2, 16.0, 2.0),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+            size=(0.2, 16.0, 1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
         ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
     wall_west = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_West",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 1.0]),
+        prim_path="{ENV_REGEX_NS}/wall_west",
         spawn=MeshCuboidCfg(
-            size=(0.2, 16.0, 2.0),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+            size=(0.2, 16.0, 1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
         ),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
 
-    # new RayCasterCfg with multi-mesh + no per-beam warping
     ray_caster = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0,0.0,0.5)),
         attach_yaw_only=False,
-        # wildcard paths pick up all four walls + the obstacle
         mesh_prim_paths=[
-            "/World/envs/env_.*//Obstacle1",
-            "/World/envs/env_.*//Wall_.*",
+            "{ENV_REGEX_NS}/Obstacle1",
+            "{ENV_REGEX_NS}/wall_north",
+            "{ENV_REGEX_NS}/wall_south",
+            "{ENV_REGEX_NS}/wall_east",
+            "{ENV_REGEX_NS}/wall_west",
         ],
-
-
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-15.0, -15.0),
-            horizontal_fov_range=(-180.0, 180.0),
-            horizontal_res=1.0,
+            vertical_fov_range=(-15.0,-15.0),
+            horizontal_fov_range=(-180.0,180.0),
+            horizontal_res=1.0
         ),
         debug_vis=False,
     )
@@ -216,25 +201,6 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     def __post_init__(self):
         """Post intialization."""
         super().__post_init__()
-        # spawn your walls as four thin cuboids around the −8…+8 square:
-        for name, (px, py, sx, sy) in {
-            "wall_north": (0.0, +8.0, 16.0, 0.2),
-            "wall_south": (0.0, -8.0, 16.0, 0.2),
-            "wall_east":  (+8.0,  0.0, 0.2, 16.0),
-            "wall_west":  (-8.0,  0.0, 0.2, 16.0),
-        }.items():
-            prim = f"{self.env_regex_ns}/{name}"
-            sim_utils.MeshCuboidCfg(
-                size=(sx, sy, 1.0),
-                collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-                visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5)),
-            ).func(
-                prim_path=prim,
-                cfg=None,
-                translation=(px, py, 0.5),
-                orientation=(1.0, 0.0, 0.0, 0.0),
-            )
-
         self.robot.init_state = self.robot.init_state.replace(
             pos=(0.0, 0.0, 0.0),
         )
