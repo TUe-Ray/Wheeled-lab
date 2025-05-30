@@ -140,96 +140,77 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             visual_material=PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0)),
         ),
     )
-    # lights
-    light = AssetBaseCfg(
-        prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
-    )
 
-
-    wall_pos_north = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_North",
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(16.0, 0.2, 2.0),  # 16 m long, 0.2 m thick, 2 m tall
-            collision_props=sim_utils.CollisionPropertiesCfg(
-                contact_offset=0.01, rest_offset=0.0
-            ),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.7, 0.7, 0.7)),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[0.0,  8.0, 1.0],  # centered on +Y
-            rot=[0, 0, 0, 1],
-        ),
-    )
-    wall_pos_south = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_South",
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(16.0, 0.2, 2.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(
-                contact_offset=0.01, rest_offset=0.0
-            ),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.7, 0.7, 0.7)),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[0.0, -8.0, 1.0],  # centered on -Y
-            rot=[0, 0, 0, 1],
-        ),
-    )
-    wall_pos_east = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_East",
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(0.2, 16.0, 2.0),  # 0.2 m thick along X, 16 m long along Y
-            collision_props=sim_utils.CollisionPropertiesCfg(
-                contact_offset=0.01, rest_offset=0.0
-            ),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.7, 0.7, 0.7)),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[ 8.0, 0.0, 1.0],  # centered on +X
-            rot=[0, 0, 0, 1],
-        ),
-    )
-    wall_pos_west = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Wall_West",
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(0.2, 16.0, 2.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(
-                contact_offset=0.01, rest_offset=0.0
-            ),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.7, 0.7, 0.7)),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[-8.0, 0.0, 1.0],  # centered on -X
-            rot=[0, 0, 0, 1],
-        ),
-    )
-    obstacle1:   AssetBaseCfg            = AssetBaseCfg(
+    # a drifting obstacle
+    obstacle1 = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0,0.0,0.0], rot=[1,0,0,0]),
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(1.5, 1.5 , 1.5),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0, 0.0, 0.75]),
+        spawn=MeshCuboidCfg(
+            size=(1.5, 1.5, 1.5),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.8, 0.2, 0.2)),
         ),
     )
-# LiDAR sensor
+
+    # four walls at ±8 m in X/Y forming a big square (z-height 2 m)
+    wall_north = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Wall_North",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0,  8.0, 1.0]),
+        spawn=MeshCuboidCfg(
+            size=(16.0, 0.2, 2.0),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+        ),
+    )
+    wall_south = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Wall_South",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -8.0, 1.0]),
+        spawn=MeshCuboidCfg(
+            size=(16.0, 0.2, 2.0),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+        ),
+    )
+    wall_east = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Wall_East",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[ 8.0, 0.0, 1.0]),
+        spawn=MeshCuboidCfg(
+            size=(0.2, 16.0, 2.0),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+        ),
+    )
+    wall_west = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Wall_West",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 1.0]),
+        spawn=MeshCuboidCfg(
+            size=(0.2, 16.0, 2.0),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+        ),
+    )
+
+    # new RayCasterCfg with multi-mesh + no per-beam warping
     ray_caster = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/main_body", #Robot/mushr_nano/base_link",   
+        prim_path="{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
         attach_yaw_only=False,
-        
-        #mesh_prim_paths=["/World/envs/env_*/Obstacle1"],
-        #mesh_prim_paths=["/World/ground"],
-
-        
+        # wildcard paths pick up all four walls + the obstacle
+        mesh_prim_paths=[
+            "/World/envs/env_.*//Obstacle1",
+            "/World/envs/env_.*//Wall_.*",
+        ],
+        # enable dynamic multi-mesh logic from PR #1886
+        dynamic_meshes=True,
+        # disable the old per-beam warp (you really only want it for static, pre-warped meshes)
+        per_beam_warp=False,
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-15.0,-15.0) ,
+            vertical_fov_range=(-15.0, -15.0),
             horizontal_fov_range=(-180.0, 180.0),
-            horizontal_res=1.0
+            horizontal_res=1.0,
         ),
-        
         debug_vis=False,
     )
 
