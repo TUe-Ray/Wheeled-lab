@@ -135,15 +135,20 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    # four walls at ±8
-    wall_north = AssetBaseCfg(
+    wall_north = RigidObject(
         prim_path="{ENV_REGEX_NS}/wall_north",
         spawn=MeshCuboidCfg(
-            size=(16.0, 0.2, 1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
+            size=(10.0, 0.2, 1.0),
+            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 8.0, 0.5], rot=[1,0,0,0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 5.0, 0.5], rot=[1,0,0,0]),
+        physics_material=RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
+        ),
     )
     wall_south = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
@@ -709,16 +714,7 @@ class TraverseABCfg:
 
 @configclass
 class DriftCurriculumCfg:
-    # Every 20 eps reduce the alignment reward by 4, up to 5 times (20→0)
-    decay_align = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "sustained_turn",
-            "increase": -1,
-            "episodes_per_increase": 2,
-            "max_increases": 10,
-        },
-    )
+    # Every 20 eps reduce the alignment reward by 4, up to 5 times (
 
     decay_flip = CurrTerm(
         func=increase_reward_weight_over_time,
