@@ -10,7 +10,7 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
-from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg, RigidObjectCfg, RigidBodyMaterialCfg
+from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg, RigidObjectCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg, MeshCuboidCfg, CollisionPropertiesCfg
 from isaaclab.managers import (
     EventTermCfg as EventTerm,
@@ -143,7 +143,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
         ),
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 5.0, 0.5], rot=[1,0,0,0]),
-        physics_material=RigidBodyMaterialCfg(
+        physics_material= sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
             restitution_combine_mode="multiply",
             static_friction=1.0,
