@@ -137,43 +137,29 @@ class DriftTerrainImporterCfg(TerrainImporterCfg):
     debug_vis=False
 
 
-from isaaclab.terrains import TerrainImporterCfg
-@configclass
-class OneFieldGen:
-    terrain_0: MeshRepeatedObjectsTerrainCfg = MeshRepeatedObjectsTerrainCfg(
-        size=(16.0, 16.0),
-        platform_width=2.0,
-        object_type="box",
-         object_params_start={
-            "num_objects": 1, "size": (0.3,0.3),
-            "max_yx_angle":0.0, "degrees":0,
-        },
-        object_params_end={
-            "num_objects": 5, "size": (0.5,0.5),
-            "max_yx_angle":45.0, "degrees":360,
-        },
-    )
-
-
-ONE_FIELD_GEN = OneFieldGen()
 
 @configclass
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-    terrain = TerrainImporterCfg(
-    prim_path="/World/ground",
-    terrain_type="generator",
-    terrain_generator=ONE_FIELD_GEN,   # your single‐entry generator config
-    max_init_terrain_level=0,          # so it always picks your terrain_0
-    collision_group=-1,
-    physics_material=sim_utils.RigidBodyMaterialCfg(
-        friction_combine_mode="multiply",
-        restitution_combine_mode="multiply",
-        static_friction=1.1,
-        dynamic_friction=1.0,
-    ),
-    debug_vis=False,
+
+    terrain = DriftTerrainImporterCfg()
+    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+
+    # lights
+    light = AssetBaseCfg(
+        prim_path="/World/light",
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+    )
+    obstacle1 = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Obstacle1",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(1.0,1.0,1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+        ),
     )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
