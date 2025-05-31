@@ -204,7 +204,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             horizontal_fov_range=(-180.0,180.0),
             horizontal_res=1.0
         ),
-        debug_vis=True,
+        debug_vis=False,
     )
 
 
