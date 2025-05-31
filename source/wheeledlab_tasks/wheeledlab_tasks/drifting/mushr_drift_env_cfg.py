@@ -686,10 +686,10 @@ class TraverseABCfg:
     reach = RewTerm(func=goal_reached_reward, weight=500.0)
 
     # sustained turns (as before)
-    sustained_turn = RewTerm(
-        func=sustained_turn_reward,
-        weight=10,
-    )
+    # sustained_turn = RewTerm(
+    #     func=sustained_turn_reward,
+    #     weight=10,
+    # )
 
     
     flip_penalty = RewTerm(
