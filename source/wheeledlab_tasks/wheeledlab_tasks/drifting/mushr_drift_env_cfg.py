@@ -168,7 +168,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
     )
     wall_north = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/wall_north",
+        prim_path="{ENV_REGEX_NS}/wall_west",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
         spawn=sim_utils.CuboidCfg(
             size=(0.2, 16, 1.5),
