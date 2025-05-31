@@ -3,18 +3,18 @@ import numpy as np
 import isaacsim.core.utils.prims as prim_utils
 from itertools import product
 import random
-# def spawn_env_grid(n_envs=1024, span=8.0):
-#     grid = int(np.sqrt(n_envs))
-#     xs = np.linspace(-span, span, grid)
-#     ys = np.linspace(-span, span, grid)
-#     for idx, (x, y) in enumerate(product(xs, ys)):
-#         prim_utils.create_prim(
-#             prim_path=f"/World/envs/env_{idx}",
-#             prim_type="Xform",
-#             translation=[x, y, 0.0],
-#         )
+def spawn_env_grid(n_envs=1024, span=8.0):
+    grid = int(np.sqrt(n_envs))
+    xs = np.linspace(-span, span, grid)
+    ys = np.linspace(-span, span, grid)
+    for idx, (x, y) in enumerate(product(xs, ys)):
+        prim_utils.create_prim(
+            prim_path=f"/World/envs/env_{idx}",
+            prim_type="Xform",
+            translation=[x, y, 0.0],
+        )
 
-# spawn_env_grid(10, 8.0)
+spawn_env_grid(10, 8.0)
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -45,15 +45,9 @@ import math
 ###### COMMON CONSTANTS ######
 ##############################
 
-CORNER_IN_RADIUS = 0.3        # For termination
-CORNER_OUT_RADIUS = 2.0       # For termination
-LINE_RADIUS = 0.8             # For spawning and reward
-STRAIGHT = 0.8                # Shaping
-SLIP_THRESHOLD = 0.55         # (rad) For reward
-MAX_SPEED = 3.0               # (m/s) For action and reward
 
-# somewhere at top‐level of your script
-_prev_dist = None
+MAX_SPEED = 3.0               # (m/s) For action and reward
+prev_dist = None
 
 def reset_progress_tracker(env, env_ids):
     global _prev_dist
@@ -142,23 +136,44 @@ class DriftTerrainImporterCfg(TerrainImporterCfg):
     )
     debug_vis=False
 
+
+from isaaclab.terrains import TerrainImporterCfg
+@configclass
+class OneFieldGen:
+    terrain_0: MeshRepeatedObjectsTerrainCfg = MeshRepeatedObjectsTerrainCfg(
+        size=(16.0, 16.0),
+        platform_width=2.0,
+        object_type="box",
+         object_params_start={
+            "num_objects": 1, "size": (0.3,0.3),
+            "max_yx_angle":0.0, "degrees":0,
+        },
+        object_params_end={
+            "num_objects": 5, "size": (0.5,0.5),
+            "max_yx_angle":45.0, "degrees":360,
+        },
+    )
+
+
+ONE_FIELD_GEN = OneFieldGen()
+
 @configclass
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-    terrain = MeshRepeatedObjectsTerrainCfg(
-        size=(16.0, 16.0),
-        platform_width=2.0,
-        object_type="box",
-        object_params_start={
-            "num_objects": 1, "size": (0.3, 0.3),
-            "max_yx_angle": 0.0, "degrees": 0,
-        },
-        object_params_end={
-            "num_objects": 5, "size": (0.5, 0.5),
-            "max_yx_angle": 45.0, "degrees": 360,
-        },
-        # collision + physics props live here
+    terrain = TerrainImporterCfg(
+    prim_path="/World/ground",
+    terrain_type="generator",
+    terrain_generator=ONE_FIELD_GEN,   # your single‐entry generator config
+    max_init_terrain_level=0,          # so it always picks your terrain_0
+    collision_group=-1,
+    physics_material=sim_utils.RigidBodyMaterialCfg(
+        friction_combine_mode="multiply",
+        restitution_combine_mode="multiply",
+        static_friction=1.1,
+        dynamic_friction=1.0,
+    ),
+    debug_vis=False,
     )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -763,13 +778,6 @@ class DriftCurriculumCfg:
 ###### TERMINATION #######
 ##########################
 
-def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radius:float):
-    out = torch.logical_or(
-        off_track(env, straight, corner_out_radius) > 5,
-        in_range(env, straight, corner_in_radius) > 5
-    )
-    return out
-
 def reached_goal(env, goal=[5.0, 5.0], thresh: float = 0.3):
     pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
     goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
@@ -791,14 +799,7 @@ class GoalNavTerminationsCfg:
         }
     )
 
-#    out_of_bounds = DoneTerm(
-#        func=cart_off_track,
-#        params={
-#            "straight": STRAIGHT,
-#            "corner_in_radius": CORNER_IN_RADIUS,
-#            "corner_out_radius": CORNER_OUT_RADIUS
-#        }
-#    )
+
 
 ######################
 ###### RL ENV ########
