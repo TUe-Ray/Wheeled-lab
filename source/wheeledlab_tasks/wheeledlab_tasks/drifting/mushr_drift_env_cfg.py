@@ -3,53 +3,12 @@ import numpy as np
 import isaacsim.core.utils.prims as prim_utils
 from itertools import product
 import random
-from isaaclab.terrains import TerrainImporterCfg
-from isaaclab.utils import configclass
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
-@configclass
-class DriftTerrainImporterCfg(TerrainImporterCfg):
-
-    height = 0.0
-    prim_path = "/World/ground"
-    terrain_type="plane"
-    collision_group = -1
-    physics_material=sim_utils.RigidBodyMaterialCfg( # Material for carpet
-        friction_combine_mode="multiply",
-        restitution_combine_mode="multiply",
-        static_friction=1.1,
-        dynamic_friction=1.0,
-    )
-    debug_vis=False
-
-
-def spawn_env_grid(n_envs=1024, span=8.0):
-    grid = int(np.sqrt(n_envs))
-    xs = np.linspace(-span, span, grid)
-    ys = np.linspace(-span, span, grid)
-    for idx, (x, y) in enumerate(product(xs, ys)):
-        prim_utils.create_prim(
-            prim_path=f"/World/envs/env_{idx}",
-            prim_type="Xform",
-            translation=[x, y, 0.0],
-        )
-                # now under each env, create its own “ground” plane
-        ground_path = f"/World/envs/env_{idx}round"
-        # You could spawn a USD plane directly, or a thin cuboid:
-        prim_utils.create_prim(
-            prim_path=ground_path,
-            prim_type="Mesh",       # or "Plane"
-        )
-        # If you want it to be an infinite plane, use your TerrainImporterCfg approach
-        # with the prim_path overridden to ground_path:
-        tf_cfg = DriftTerrainImporterCfg.replace(prim_path=ground_path)
-        tf_cfg.func(ground_path, tf_cfg)
-
-spawn_env_grid(10, 8.0)
-
-
+from isaaclab.terrains import TerrainImporterCfg
+from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg, MeshCuboidCfg, CollisionPropertiesCfg
@@ -149,31 +108,38 @@ def step_progress(env, goal=torch.tensor([5.0, 5.0])):
 ###################
 ###### SCENE ######
 ###################
+@configclass
+class DriftTerrainImporterCfg(TerrainImporterCfg):
 
-
+    height = 0.0
+    prim_path = "/World/ground"
+    terrain_type="plane"
+    collision_group = -1
+    physics_material=sim_utils.RigidBodyMaterialCfg( # Material for carpet
+        friction_combine_mode="multiply",
+        restitution_combine_mode="multiply",
+        static_friction=1.1,
+        dynamic_friction=1.0,
+    )
+    debug_vis=False
 
 @configclass
 class MushrDriftSceneCfg(InteractiveSceneCfg):
     """Configuration for a Mushr car Scene with racetrack terrain with no sensors"""
 
-
-    terrain = DriftTerrainImporterCfg()
-    robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
-
-    # lights
-    light = AssetBaseCfg(
-        prim_path="/World/light",
-        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
-    )
-    obstacle1 = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle1",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
-        spawn=sim_utils.MeshCuboidCfg(
-            size=(1.0,1.0,1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
-        ),
+    terrain = MeshRepeatedObjectsTerrainCfg(
+        size=(16.0, 16.0),
+        platform_width=2.0,
+        object_type="box",
+        object_params_start={
+            "num_objects": 1, "size": (0.3, 0.3),
+            "max_yx_angle": 0.0, "degrees": 0,
+        },
+        object_params_end={
+            "num_objects": 5, "size": (0.5, 0.5),
+            "max_yx_angle": 45.0, "degrees": 360,
+        },
+        # collision + physics props live here
     )
     robot: ArticulationCfg = OriginRobotCfg.replace(prim_path="{ENV_REGEX_NS}/Robot")
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -220,33 +186,27 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
         init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
-    ray_caster: RayCasterCfg = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/main_body",      # parent of all sensors in each env
+
+    ray_caster = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/main_body",
         update_period=1,
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.5)),
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0,0.0,0.5)),
         attach_yaw_only=False,
-
-        # Any pattern “/World/envs/env_<anything>/….” → gather all ground & walls.
         mesh_prim_paths=[
-            # ground plane under each environment
-            "/World/envs/env_.*/ground(/.*)?",
-
-            # four walls in each environment
+         "/World/envs/env_.*/ground(/.*)?",
             "/World/envs/env_.*/wall_north",
             "/World/envs/env_.*/wall_south",
             "/World/envs/env_.*/wall_east",
             "/World/envs/env_.*/wall_west",
         ],
-
-        # A simple 1‐D LiDAR sweep: one vertical channel, full horizontal 360°
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-15.0, -15.0),
-            horizontal_fov_range=(-180.0, 180.0),
-            horizontal_res=1.0,
+            vertical_fov_range=(-15.0,-15.0),
+            horizontal_fov_range=(-180.0,180.0),
+            horizontal_res=1.0
         ),
         debug_vis=False,
-       )    
+    )
 
 
     def __post_init__(self):
@@ -816,7 +776,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the cartpole environment."""
 
     seed: int = 42
-    num_envs: int = 10
+    num_envs: int = 1024
     env_spacing: float = 16.
 
     # Basic Settings
