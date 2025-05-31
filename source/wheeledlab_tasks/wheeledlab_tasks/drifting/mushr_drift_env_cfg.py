@@ -10,7 +10,7 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
-from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
+from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg, RigidObjectCfg, RigidBodyMaterialCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg, MeshCuboidCfg, CollisionPropertiesCfg
 from isaaclab.managers import (
     EventTermCfg as EventTerm,
