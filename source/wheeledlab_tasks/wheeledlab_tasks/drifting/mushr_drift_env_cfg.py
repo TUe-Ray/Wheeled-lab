@@ -135,35 +135,35 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    wall_north = RigidObjectCfg(
+    wall_north = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
         spawn=sim_utils.MeshCuboidCfg(
             size=(0.2, 16, 1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
     )
-    wall_south = RigidObjectCfg(
+    wall_south = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
         spawn=sim_utils.MeshCuboidCfg(
             size=(0.2, 16, 1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
     )
-    wall_east= RigidObjectCfg(
+    wall_east= AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_east",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(5, 0,  0.5)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(5, 0,  0.5)),
         spawn=sim_utils.MeshCuboidCfg(            size=(0.2, 16, 1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
     )
-    wall_west = RigidObjectCfg(
+    wall_west = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_west",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
         spawn=sim_utils.MeshCuboidCfg(
             size=(0.2, 16, 1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
