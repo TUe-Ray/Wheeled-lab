@@ -172,6 +172,15 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
         init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
+    obstacle1 = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Obstacle1",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(1.0,1.0,1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+        ),
+    )
 
     ray_caster = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/main_body",
@@ -179,9 +188,10 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         offset=RayCasterCfg.OffsetCfg(pos=(0.0,0.0,0.5)),
         attach_yaw_only=False,
         mesh_prim_paths=[            "/World/envs/env_.*/wall_west",
-                                     "/World/envs/env_.*/wall_north"],
-                                                # "/World/envs/env_.*/wall_south",
-                                                # "/World/envs/env_.*/wall_east",     
+                                     "/World/envs/env_.*/wall_north",
+                                     "/World/envs/env_.*/wall_south",
+                                    "/World/envs/env_.*/wall_east",    
+                                    "World/envs/env_.*/obstacle1" ],
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
             vertical_fov_range=(-15.0,-15.0),
@@ -619,7 +629,7 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
     # 2) compute horizontal distance to each hit
     dist       = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
-
+    print(dist)
     # 3) how much inside the “safe” radius?
     delta      = (min_dist - dist).clamp(min=0.0)  # (B, R)
 
