@@ -3,7 +3,8 @@ import numpy as np
 import isaacsim.core.utils.prims as prim_utils
 from itertools import product
 import random
-
+from isaaclab.terrains import TerrainImporterCfg
+from isaaclab.utils import configclass
 @configclass
 class DriftTerrainImporterCfg(TerrainImporterCfg):
 
@@ -47,8 +48,7 @@ import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.terrains import TerrainImporterCfg
-from isaaclab.utils import configclass
+
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
 from isaaclab.sim import SphereCfg, PreviewSurfaceCfg, MeshCuboidCfg, CollisionPropertiesCfg
