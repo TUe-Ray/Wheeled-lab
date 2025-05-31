@@ -131,7 +131,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     goal_marker = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/GoalMarker",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[5.0, 5.0, 0.0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0, 4.0, 0.0]),
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
@@ -139,45 +139,50 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/wall_north",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.2, 0.2, 0.2),
+            size=(0.2, 16, 1.5),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
             mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
-    wall_south = AssetBaseCfg(
+    wall_south = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
-        spawn=MeshCuboidCfg(
-            size=(16.0, 0.2, 1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.2, 16, 1.5),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -8.0, 0.5], rot=[1,0,0,0]),
     )
-    wall_east = AssetBaseCfg(
+    wall_east= RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_east",
-        spawn=MeshCuboidCfg(
-            size=(0.2, 16.0, 1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(5, 0,  0.5)),
+        spawn=sim_utils.CuboidCfg(            size=(0.2, 16, 1.5),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
-    wall_west = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/wall_west",
-        spawn=MeshCuboidCfg(
-            size=(0.2, 16.0, 1.0),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5,0.5,0.5))
+    wall_north = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/wall_north",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.2, 16, 1.5),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-8.0, 0.0, 0.5], rot=[1,0,0,0]),
     )
     obstacle1 = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Obstacle1",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[1.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
-            size=(1.0,1.0,1.0),
+            size=(1.0,1.0,1.5),
             collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
         ),
@@ -199,7 +204,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             horizontal_fov_range=(-180.0,180.0),
             horizontal_res=1.0
         ),
-        debug_vis=False,
+        debug_vis=True,
     )
 
 
@@ -762,7 +767,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
 
     seed: int = 42
     num_envs: int = 1024
-    env_spacing: float = 16.
+    env_spacing: float = 11.
 
     # Basic Settings
     observations: BlindObsCfg = BlindObsCfg()
