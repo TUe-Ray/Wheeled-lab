@@ -5,6 +5,10 @@ from itertools import product
 import random
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
+import isaaclab.envs.mdp as mdp
+import isaaclab.sim as sim_utils
+from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.scene import InteractiveSceneCfg
 @configclass
 class DriftTerrainImporterCfg(TerrainImporterCfg):
 
@@ -44,10 +48,7 @@ def spawn_env_grid(n_envs=1024, span=8.0):
         tf_cfg.func(ground_path, tf_cfg)
 
 spawn_env_grid(10, 8.0)
-import isaaclab.envs.mdp as mdp
-import isaaclab.sim as sim_utils
-from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.scene import InteractiveSceneCfg
+
 
 from isaaclab.sensors.ray_caster import RayCasterCfg, patterns
 from isaaclab.assets import ArticulationCfg, RigidObject, AssetBaseCfg
