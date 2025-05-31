@@ -36,7 +36,7 @@ def spawn_env_grid(n_envs=1024, span=8.0):
             translation=[x, y, 0.0],
         )
                 # now under each env, create its own “ground” plane
-        ground_path = f"{env_path}/ground"
+        ground_path = f"/World/envs/env_{idx}round"
         # You could spawn a USD plane directly, or a thin cuboid:
         prim_utils.create_prim(
             prim_path=ground_path,
