@@ -135,19 +135,15 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    wall_north = RigidObject(
+    wall_north = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
-        spawn=MeshCuboidCfg(
-            size=(10.0, 0.2, 1.0),
-            collision_props=CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 5.0, 0.5], rot=[1,0,0,0]),
-        physics_material= sim_utils.RigidBodyMaterialCfg(
-            friction_combine_mode="multiply",
-            restitution_combine_mode="multiply",
-            static_friction=1.0,
-            dynamic_friction=1.0,
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.2, 0.2, 0.2),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
     wall_south = AssetBaseCfg(
