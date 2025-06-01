@@ -456,7 +456,7 @@ class TraverseABCfg:
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
         weight=5.0,         
-        params={"min_dist": 0., "exponent": 2.0},
+        params={"min_dist": 0.3, "exponent": 2.0},
     )
 
 ########################
