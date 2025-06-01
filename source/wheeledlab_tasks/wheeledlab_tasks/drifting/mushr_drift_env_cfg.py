@@ -135,47 +135,46 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    wall_north = RigidObjectCfg(
+    wall_north = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
-        spawn=sim_utils.CuboidCfg(
-            size=(0.2, 16, 1.5),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0,  5.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(10.0, 0.2, 1.5),  # length=10 in X, thickness=0.2 in Y, height=1.5 in Z
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
         ),
     )
-    wall_south = RigidObjectCfg(
+
+    # ── South wall under /World/envs/env_i/wall_south ──
+    wall_south = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
-        spawn=sim_utils.CuboidCfg(
-            size=(0.2, 16, 1.5),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -5.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(10.0, 0.2, 1.5),  # length=10 in X, thickness=0.2 in Y, height=1.5 in Z
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
         ),
     )
-    wall_east= RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/wall_east",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(5, 0,  0.5)),
-        spawn=sim_utils.CuboidCfg(            size=(0.2, 16, 1.5),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
-        ),
-    )
-    wall_west= RigidObjectCfg(
+
+   
+    wall_west = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_west",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
-        spawn=sim_utils.CuboidCfg(
-            size=(0.2, 16, 1.5),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
-            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[-5.0, 0.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(0.2, 10.0, 1.5),  # thickness=0.2 in X, length=10 in Y, height=1.5 in Z
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
+        ),
+    )
+
+    # ── East wall under /World/envs/env_i/wall_east ──
+    wall_east = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/wall_east",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[ 5.0, 0.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=sim_utils.MeshCuboidCfg(
+            size=(0.2, 10.0, 1.5),  # thickness=0.2 in X, length=10 in Y, height=1.5 in Z
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.5, 0.5)),
         ),
     )
     obstacle1 = AssetBaseCfg(
@@ -392,6 +391,8 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 #             rot=[0.0, 0.0, 0.0, 1.0],
 #         )
 #     return torch.zeros(env.num_envs, device=env.device)
+
+
 
 
 # 4) RANDOMIZE GOAL
@@ -781,6 +782,10 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
     curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
 
     def __post_init__(self):
+                # Scene settings
+        self.scene = MushrDriftSceneCfg(
+            num_envs=self.num_envs, env_spacing=self.env_spacing,
+        )
         """Post initialization."""
         super().__post_init__()
 
@@ -796,10 +801,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
 
         self.observations.policy.enable_corruption = True
 
-        # Scene settings
-        self.scene = MushrDriftSceneCfg(
-            num_envs=self.num_envs, env_spacing=self.env_spacing,
-        )
+
 
 ######################
 ###### PLAY ENV ######
