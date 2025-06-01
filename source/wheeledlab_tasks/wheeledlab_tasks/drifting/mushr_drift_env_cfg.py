@@ -551,29 +551,35 @@ def turn_in_place_reward(env):
 
 def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     """
-    Continuous obstacle‐proximity penalty:
-      - If dist >= min_dist  →  0
-      - If dist <  min_dist  →  ((min_dist - dist)/min_dist)**exponent
-    Then we average over all beams to get a [0,1] signal per env.
+    Penalty based on the *closest* LiDAR hit in each environment.
+    - If the closest hit is ≥ min_dist → 0 penalty.
+    - If it’s < min_dist       → ((min_dist − d_min)/min_dist)**exponent.
+    Returns a tensor of shape (B,) in [0,1].
     """
-    # 1) pull out the front‐facing LiDAR hits
-    lidar      = env.scene.sensors["ray_caster"]
-    hits_w     = lidar.data.ray_hits_w              # (B, R, 3)
-    print("hits", hits_w)
-    positions  = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # (B, 1, 2)
-    print("positions", positions)
-    # 2) compute horizontal distance to each hit
-    dist       = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
-    print("dist", dist)
-    # 3) how much inside the “safe” radius?
-    delta      = (min_dist - dist).clamp(min=0.0)  # (B, R)
+    # 1) Grab the LiDAR sensor and its world‐space hit points
+    lidar  = env.scene.sensors["ray_caster"]
+    hits_w = lidar.data.ray_hits_w                # shape (B, R, 3)
 
-    # 4) normalize & raise to exponent
-    penalty_beams = (delta / min_dist) ** exponent  # (B, R), in [0,1]
+    # 2) Robot’s base‐XY in world‐space
+    positions = mdp.root_pos_w(env)[..., :2]       # shape (B, 2)
+    positions = positions.unsqueeze(1)             # shape (B, 1, 2)
 
-    # 5) average (or sum) across beams
-    #    → mean gives you a [0,1] per‐env penalty
-    return penalty_beams.mean(dim=-1)
+    # 3) Compute horizontal distance from robot to every hit
+    #    (ignore Z, since we only care about XY distance)
+    dist = torch.norm(hits_w[..., :2] - positions, dim=-1)  # shape (B, R)
+
+    # 4) For each env, find the *closest* beam distance
+    d_min = dist.min(dim=-1).values                         # shape (B,)
+
+    # 5) How much this d_min is “inside” the safe radius?
+    #    If d_min ≥ min_dist → 0; otherwise (min_dist − d_min)
+    delta = (min_dist - d_min).clamp(min=0.0)                # shape (B,)
+
+    # 6) Normalize and raise to exponent → penalty ∈ [0,1]
+    penalty = (delta / min_dist).pow(exponent)              # shape (B,)
+
+    return penalty
+
 
 
 def flip_penalty(env):
