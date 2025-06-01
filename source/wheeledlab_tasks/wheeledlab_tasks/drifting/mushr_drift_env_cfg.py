@@ -340,8 +340,8 @@ class DriftEventsCfg:
         params={
             # Sample local x uniformly in [-5,5], same for y, and keep z=0
             "pose_range": {
-                "x": (-5.0, 5.0),
-                "y": (-5.0, 5.0),
+                "x": (-4.5, 0.0),
+                "y": (-4.5, 0.0),
                 "z": (0.0, 0.0),
             },
             # No initial velocity
