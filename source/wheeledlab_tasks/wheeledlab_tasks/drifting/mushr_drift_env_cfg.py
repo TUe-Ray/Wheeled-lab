@@ -453,7 +453,6 @@ def velocity_toward_obstacle_penalty(
     lidar   = env.scene.sensors["ray_caster"]
     hits_w  = lidar.data.ray_hits_w        # shape (B, R, 3)
     pos_world = mdp.root_pos_w(env)[..., :2] + env.scene.env_origins[:, :2]
-    print("pos_world", pos_world)
     # 3) Compute horizontal distance from robot to every beam (B, R)
     dist_all = torch.norm(hits_w[..., :2] - pos_world.unsqueeze(1), dim=-1)  # (B, R)
     d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
