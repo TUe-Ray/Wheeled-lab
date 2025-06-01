@@ -199,7 +199,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
                                     "/World/envs/env_.*/obstacle1" ],
         pattern_cfg=patterns.LidarPatternCfg(
             channels=1,
-            vertical_fov_range=(-15.0,-15.0),
+            vertical_fov_range=(0, 0),
             horizontal_fov_range=(-180.0,180.0),
             horizontal_res=1.0
         ),
