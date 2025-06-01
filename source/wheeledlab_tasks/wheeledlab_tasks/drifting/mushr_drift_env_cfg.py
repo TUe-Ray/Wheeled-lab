@@ -383,47 +383,34 @@ def goal_reached_reward(env, goal=torch.tensor([5.0,5.0]), threshold=0.3):
 
 def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     """
-    Penalty based on the closest LiDAR hit in each environment:
-      - If d_min >= min_dist  → 0.0
-      - If d_min <  min_dist  → −magnitude, where magnitude runs from 0.2 (at d_min == min_dist)
-                                 up to 1.0 (at d_min == 0).
-    Returns a tensor of shape (B,), each entry ≤ 0.
+    Penalty based on the *closest* LiDAR hit in each environment.
+    - If the closest hit is ≥ min_dist → 0 penalty.
+    - If it’s < min_dist       → ((min_dist − d_min)/min_dist)**exponent.
+    Returns a tensor of shape (B,) in [0,1].
     """
-    # 1) Grab LiDAR hits (world-space)
+    # 1) Grab the LiDAR sensor and its world‐space hit points
     lidar  = env.scene.sensors["ray_caster"]
-    hits_w = lidar.data.ray_hits_w   # shape (B, R, 3)
+    hits_w = lidar.data.ray_hits_w                # shape (B, R, 3)
 
-    # 2) Robot’s base-XY (world-space)
-    positions = mdp.root_pos_w(env)[..., :2]  # (B, 2)
-    positions = positions.unsqueeze(1)        # (B, 1, 2)
+    # 2) Robot’s base‐XY in world‐space
+    positions = mdp.root_pos_w(env)[..., :2]       # shape (B, 2)
+    positions = positions.unsqueeze(1)             # shape (B, 1, 2)
 
-    # 3) Compute horizontal distance from robot to each hit
-    dist = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
+    # 3) Compute horizontal distance from robot to every hit
+    #    (ignore Z, since we only care about XY distance)
+    dist = torch.norm(hits_w[..., :2] - positions, dim=-1)  # shape (B, R)
 
-    # 4) Find closest distance per env
-    d_min = dist.min(dim=-1).values  # (B,)
+    # 4) For each env, find the *closest* beam distance
+    d_min = dist.min(dim=-1).values                         # shape (B,)
 
-    # 5) Prepare output (initialized to zero = “no penalty”)
-    penalty = torch.zeros_like(d_min, device=env.device)  # (B,)
+    # 5) How much this d_min is “inside” the safe radius?
+    #    If d_min ≥ min_dist → 0; otherwise (min_dist − d_min)
+    delta = (min_dist - d_min).clamp(min=0)                # shape (B,)
 
-    # 6) Mask for those that are “inside” min_dist
-    inside = (d_min < min_dist)  # boolean mask of shape (B,)
-
-    if inside.any():
-        # 7) Compute raw proximity factor in (0, 1]:  raw = ((min_dist - d_min) / min_dist)^exponent
-        delta = (min_dist - d_min[inside]).clamp(min=0.0)      # shape (n_inside,)
-        raw   = (delta / min_dist).pow(exponent)               # shape (n_inside,), in [0..1]
-
-        # 8) Now remap “raw” so that:
-        #      raw = 0   → magnitude = 0.2
-        #      raw = 1   → magnitude = 1.0
-        #    In other words: magnitude = 0.2 + raw * (1.0 - 0.2).
-        magnitude = 0.2 + raw * 0.8    # shape (n_inside,), in [0.2..1.0]
-
-        # 9) Assign a negative penalty in those environments:
-        penalty[inside] = - magnitude
-
+    # 6) Normalize and raise to exponent → penalty ∈ [0,1]
+    penalty = (delta / min_dist).pow(exponent)              # shape (B,)
     return penalty
+
 
 
 def flip_penalty(env):
