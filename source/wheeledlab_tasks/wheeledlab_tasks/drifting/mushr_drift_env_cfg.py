@@ -469,7 +469,7 @@ def velocity_toward_obstacle_penalty(
     closest_hit_xy = torch.gather(hits_w[..., :2], dim=1, index=beam_indices).squeeze(1)  # (B, 2)
 
     # 6) Compute unit‐vector from robot→closest hit, only where mask_close
-    vec_to_obs = closest_hit_xy - pos_xy.squeeze(1)  # (B, 2)
+    vec_to_obs = closest_hit_xy - pos_world.squeeze(1)  # (B, 2)
     unit_to_obs = torch.zeros_like(vec_to_obs)        # (B, 2)
     unit_to_obs[mask_close] = torch.nn.functional.normalize(
         vec_to_obs[mask_close], dim=-1
