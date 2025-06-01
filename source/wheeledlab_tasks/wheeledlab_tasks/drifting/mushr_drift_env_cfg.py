@@ -407,11 +407,12 @@ def forward_velocity_bonus(env, max_speed: float = 3.0) -> torch.Tensor:
 
 def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
     pos = mdp.root_pos_w(env)[..., :2]
+    print("SIGNEDVEL", positions)
     vel = mdp.base_lin_vel(env)[..., :2]
 
     to_goal      = goal.to(env.device) - pos
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
-
+    print("DIST TO GOAL")
     speed    = torch.norm(vel, dim=-1).clamp(max=V_MAX)
     vel_norm = torch.nn.functional.normalize(vel + 1e-6, dim=-1)
     cosine   = (vel_norm * to_goal_norm).sum(dim=-1).clamp(-1.0,1.0)
@@ -422,6 +423,7 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
 
 def distance_bonus(env, goal=torch.tensor([4.0,4.0])):
     pos  = mdp.root_pos_w(env)[...,:2]
+    print("DISTANCE BONUS", positions)
     dist = torch.norm(goal.to(env.device)-pos, dim=-1).clamp(max=D_MAX)
     norm = (1.0 - dist/D_MAX).clamp(0.0, 1.0)
     return norm**2
@@ -429,6 +431,7 @@ def distance_bonus(env, goal=torch.tensor([4.0,4.0])):
 
 def goal_reached_reward(env, goal=torch.tensor([4.0,4.0]), threshold=0.3):
     pos  = mdp.root_pos_w(env)[..., :2]
+    print("GOAL REACHED", positions)
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     out  = torch.where(dist < threshold, 1.0, 0.0)
     return out
@@ -506,6 +509,7 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     hits_w = lidar.data.ray_hits_w            
 
     positions = mdp.root_pos_w(env)[..., :2]    
+    print("LIDARPENALTY", positions)
     positions = positions.unsqueeze(1)             
     dist = torch.norm(hits_w[..., :2] - positions, dim=-1) 
 
@@ -523,7 +527,7 @@ class TraverseABCfg:
         weight= 20.0,
     )
 
-    dist_penalty = RewTerm(
+    dist_bonus = RewTerm(
         func=distance_bonus ,
         weight=5,
     )
@@ -593,7 +597,8 @@ class DriftCurriculumCfg:
 ##########################
 
 def reached_goal(env, goal=[4.0, 4.0], thresh: float = 0.3):
-    pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
+    pos   = mdp.root_pos_w(env)[..., :2]          
+    print("TERMINATION", positions)     # B x 2
     goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
     dist  = torch.norm(pos - goal, dim=-1)             # B]
     reached = dist < thresh
