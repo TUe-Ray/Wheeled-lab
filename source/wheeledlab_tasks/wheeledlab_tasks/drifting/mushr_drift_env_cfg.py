@@ -335,7 +335,7 @@ class DriftEventsCfg:
 
 
     reset_robot = EventTerm(
-        func=reset_root_state_uniform,
+        func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
             # Sample local x uniformly in [-5,5], same for y, and keep z=0
