@@ -405,11 +405,10 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
     # 5) How much this d_min is “inside” the safe radius?
     #    If d_min ≥ min_dist → 0; otherwise (min_dist − d_min)
-    delta = (min_dist - d_min).clamp(min=0.0)                # shape (B,)
+    delta = (min_dist - d_min).clamp(min=0.2)                # shape (B,)
 
     # 6) Normalize and raise to exponent → penalty ∈ [0,1]
     penalty = (delta / min_dist).pow(exponent)              # shape (B,)
-    penalty = -penalty -0.2
     return penalty
 
 
@@ -443,21 +442,21 @@ class TraverseABCfg:
 
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=20,
+        weight=5,
     )
 
     alive = RewTerm(func=mdp.rewards.is_alive, weight=1.0)
     reach = RewTerm(func=goal_reached_reward, weight=500.0)
 
-    flip_penalty = RewTerm(
-        func=flip_penalty,
-        weight=500,    
-    )
+    # flip_penalty = RewTerm(
+    #     func=flip_penalty,
+    #     weight=500,    
+    # )
     
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
         weight=5.0,         
-        params={"min_dist": 0.3, "exponent": 2.0},
+        params={"min_dist": 0., "exponent": 2.0},
     )
 
 ########################
@@ -471,9 +470,9 @@ class DriftCurriculumCfg:
     decay_flip = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "flip_penalty",
-            "increase": -100,
-            "episodes_per_increase": 4,
+            "reward_term_name": "step_toward",
+            "increase": 5,
+            "episodes_per_increase": 20,
             "max_increases": 5,
         },
     )
