@@ -135,39 +135,47 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
-    wall_north = AssetBaseCfg(
+    wall_north = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_north",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
-        spawn=sim_utils.MeshCuboidCfg(
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
             size=(0.2, 16, 1.5),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
-    wall_south = AssetBaseCfg(
+    wall_south = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
-        spawn=sim_utils.MeshCuboidCfg(
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, -5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
             size=(0.2, 16, 1.5),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
-    wall_east= AssetBaseCfg(
+    wall_east= RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_east",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(5, 0,  0.5)),
-        spawn=sim_utils.MeshCuboidCfg(            size=(0.2, 16, 1.5),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(5, 0,  0.5)),
+        spawn=sim_utils.CuboidCfg(            size=(0.2, 16, 1.5),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
-    wall_west = AssetBaseCfg(
+    wall_west= RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/wall_west",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
-        spawn=sim_utils.MeshCuboidCfg(
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 5, 0.5)),
+        spawn=sim_utils.CuboidCfg(
             size=(0.2, 16, 1.5),
-            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.01, rest_offset=0.0),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(max_depenetration_velocity=1.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.5, 0.0, 0.0)),
         ),
     )
     obstacle1 = AssetBaseCfg(
@@ -627,7 +635,6 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
     # 2) compute horizontal distance to each hit
     dist       = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
-    print(dist)
     # 3) how much inside the “safe” radius?
     delta      = (min_dist - dist).clamp(min=0.0)  # (B, R)
 
