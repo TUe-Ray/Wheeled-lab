@@ -453,14 +453,12 @@ def velocity_toward_obstacle_penalty(
     # 1) Grab LiDAR hits in world‐space (B, R, 3)
     lidar   = env.scene.sensors["ray_caster"]
     hits_w  = lidar.data.ray_hits_w        # shape (B, R, 3)
-    print(hits_w)
     # 2) Robot’s base XY position (B, 2)
     pos_xy = mdp.root_pos_w(env)[..., :2]   # (B, 2)
     pos_xy = pos_xy.unsqueeze(1)            # (B, 1, 2)
     print("posxy", pos_xy)
     # 3) Compute horizontal distance from robot to every beam (B, R)
     dist_all = torch.norm(hits_w[..., :2] - pos_xy, dim=-1)  # (B, R)
-    print(dist_all)
     d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
 
     # 4) Build mask of “too close” (only penalize if d_min < min_dist AND finite)

@@ -100,7 +100,7 @@ class BlindObsCfg:
         )
         lidar_term = ObsTerm(
             func = lidar_distances,
-            noise =Gnoise(mean =0.,std=0.02),
+            noise =Gnoise(mean =0.,std=0.2),
             clip=(0.0,50.0)
 
         )
@@ -119,7 +119,7 @@ class BlindObsCfg:
 
         wheel_odom = ObsTerm(
             func=wheel_encoder,
-            noise=Gnoise(std=0.01),
+            noise=Gnoise(std=0.1),
             clip=(-MAX_SPEED, MAX_SPEED),
         )
         def __post_init__(self):
