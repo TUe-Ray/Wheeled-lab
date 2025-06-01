@@ -409,7 +409,7 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
     # 6) Normalize and raise to exponent → penalty ∈ [0,1]
     penalty = (delta / min_dist).pow(exponent)              # shape (B,)
-    return penalty
+    return -penalty
 
 
 
@@ -455,7 +455,7 @@ class TraverseABCfg:
     
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=5.0,         
+        weight=10.0,         
         params={"min_dist": 0.3, "exponent": 2.0},
     )
 
