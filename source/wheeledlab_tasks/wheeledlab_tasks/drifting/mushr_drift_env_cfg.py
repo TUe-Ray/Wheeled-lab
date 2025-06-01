@@ -431,61 +431,65 @@ def goal_reached_reward(env, goal=torch.tensor([4.0,4.0]), threshold=0.3):
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     out  = torch.where(dist < threshold, 1.0, 0.0)
     return out
-
 def velocity_toward_obstacle_penalty(
     env,
     min_dist: float = 0.5,
     exponent: float = 2.0,
 ) -> torch.Tensor:
     """
-    Penalty based purely on how fast you drive *into* the closest obstacle,
-    but only when that obstacle is closer than `min_dist`.  Otherwise 0.
+    Penalty ∝ (min_dist − d_min)/min_dist  times  (speed_toward / V_MAX),
+    raised to `exponent`, and negated.  In other words:
+       d_factor    = max((min_dist − d_min)/min_dist, 0)
+       norm_speed  = max(speed_toward, 0) / V_MAX
+       penalty     = – (d_factor * norm_speed) ** exponent
 
-    Steps:
-      1) Find d_min = closest LiDAR hit distance.
-      2) If d_min >= min_dist, penalty=0.
-      3) Else: look at your world‐frame XY velocity; project onto the
-         unit‐vector pointing from robot→closest hit.
-         If that projection > 0 (i.e. you’re driving toward it), compute
-         (speed_toward / V_MAX)^exponent.  Otherwise 0.
+    - If d_min ≥ min_dist  →  d_factor = 0  →  penalty = 0.
+    - Otherwise you pay a larger negative penalty the closer “d_min” is and/or the faster
+      you drive into it.
+
+    Returns a tensor of shape (B,), negative or zero.
     """
     # 1) Grab LiDAR hits in world‐space (B, R, 3)
     lidar   = env.scene.sensors["ray_caster"]
-    hits_w  = lidar.data.ray_hits_w        # shape (B, R, 3)
-    pos_world = mdp.root_pos_w(env)[..., :2] + env.scene.env_origins[:, :2]
+    hits_w  = lidar.data.ray_hits_w        # (B, R, 3)
+
+    # 2) Robot’s base XY position in world (B, 2)
+    pos_world = mdp.root_pos_w(env)[..., :2] + env.scene.env_origins[:, :2]  # (B, 2)
+    pos_world = pos_world.unsqueeze(1)  # (B, 1, 2)
+
     # 3) Compute horizontal distance from robot to every beam (B, R)
-    dist_all = torch.norm(hits_w[..., :2] - pos_world.unsqueeze(1), dim=-1)  # (B, R)
-    d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
+    dist_all = torch.norm(hits_w[..., :2] - pos_world, dim=-1)  # (B, R)
+    d_min, idx_min = dist_all.min(dim=-1)                        # both shape (B,)
 
-    # 4) Build mask of “too close” (only penalize if d_min < min_dist AND finite)
-    mask_close = (d_min < min_dist) & torch.isfinite(d_min)   # (B,)
+    # 4) Build a “distance factor” only where d_min < min_dist
+    #    d_factor = (min_dist − d_min)/min_dist, clamped to [0, 1]
+    zero = torch.zeros_like(d_min)
+    d_factor = ((min_dist - d_min) / min_dist).clamp(min=0.0, max=1.0)  # (B,)
 
-    # 5) For those envs where mask_close=True, figure out the exact XY of that closest hit
+    # 5) Find the XY of the closest hit (only used to compute direction, but distance factor is already from d_min)
     batch_size = hits_w.shape[0]
-    # idx_min is (B,), turn into index of shape (B,1,2) so gather grabs XY:
     beam_indices = idx_min.view(batch_size, 1, 1).expand(batch_size, 1, 2)
     closest_hit_xy = torch.gather(hits_w[..., :2], dim=1, index=beam_indices).squeeze(1)  # (B, 2)
 
-    # 6) Compute unit‐vector from robot→closest hit, only where mask_close
-    vec_to_obs = closest_hit_xy - pos_world.squeeze(1)  # (B, 2)
-    unit_to_obs = torch.zeros_like(vec_to_obs)        # (B, 2)
+    # 6) Compute unit‐vector from robot→closest hit (only needed for speed‐toward‐obstacle)
+    vec_to_obs = closest_hit_xy - pos_world.squeeze(1)       # (B, 2)
+    unit_to_obs = torch.zeros_like(vec_to_obs)                # (B, 2)
+    mask_close = (d_min < min_dist) & torch.isfinite(d_min)   # (B,)
     unit_to_obs[mask_close] = torch.nn.functional.normalize(
         vec_to_obs[mask_close], dim=-1
     )
 
-    # 7) Get robot’s world‐frame XY velocity (B, 2) and project onto unit_to_obs
-    vel_world = mdp.base_lin_vel(env)[..., :2]       # (B, 2)
+    # 7) Project robot’s world‐frame XY velocity onto that direction
+    vel_world = mdp.base_lin_vel(env)[..., :2]    # (B, 2)
     speed_toward = (vel_world * unit_to_obs).sum(dim=-1)  # (B,)
-    # clamp to ≥0 (we only penalize if driving toward)
-    speed_toward = speed_toward.clamp(min=0.0)
+    speed_toward = speed_toward.clamp(min=0.0)            # only penalize if >0
+    norm_speed = (speed_toward / V_MAX).clamp(max=1.0)  # (B,)
 
-    # 8) Build the final penalty vector (B,).  Zero by default; fill in where mask_close
-    penalty = torch.zeros_like(d_min)  # (B,)
-    if mask_close.any():
-        norm_speed = (speed_toward[mask_close]).clamp(max=1.0)  # (n_close,)
-        penalty[mask_close] = norm_speed.pow(exponent)                 # (n_close,)
+    # 9) Combine distance factor × normalized speed, raise to exponent
+    combined = d_factor * norm_speed                    # (B,)
+    penalty = - (combined.pow(exponent))                # (B,)
 
-    return -penalty
+    return penalty
 
 def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     """
@@ -552,7 +556,7 @@ class DriftCurriculumCfg:
     increase_penalty = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "dist_penalty",
+            "reward_term_name": "dist_bonus",
             "increase": 5,
             "episodes_per_increase": 20,
             "max_increases": 3,
@@ -564,8 +568,8 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "lidar_obstacle_penalty",
-            "increase": -50,
-            "episodes_per_increase": 50,
+            "increase": -54,
+            "episodes_per_increase": 25,
             "max_increases": 4,
         },
     )
@@ -575,7 +579,7 @@ class DriftCurriculumCfg:
         params={
             "reward_term_name": "velocity_toward_obstacle_penalty",
             "increase": 10,
-            "episodes_per_increase": 50,
+            "episodes_per_increase": 25,
             "max_increases": 8,
         },
     )
