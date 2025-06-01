@@ -32,8 +32,9 @@ import math
 ###### COMMON CONSTANTS ######
 ##############################
 
-
-MAX_SPEED = 3.0               # (m/s) For action and reward
+W_MAX = 6.0    # max |yaw rate| (rad/s)
+V_MAX = 3.0    # max linear speed (m/s)
+D_MAX = (10**2 + 10**2)**0.5  # ≈7.07 m
 prev_dist = None
 
 def reset_progress_tracker(env, env_ids):
@@ -41,8 +42,6 @@ def reset_progress_tracker(env, env_ids):
     _prev_dist = None
     return None   # EventTerms always expect a return, even if you don’t use it
 
-
-from collections import deque
 
 
 _turn_buffers = None
@@ -60,27 +59,6 @@ def clear_turn_buffers(env, env_ids):
             _turn_buffers[i].clear()
     # return a dummy tensor so IsaacLab is happy
     return torch.zeros(env.num_envs, device=env.device)
-
-def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
-    # 1) world-frame position & velocity
-    pos = mdp.root_pos_w(env)[..., :2]          # (B,2)
-    vel = mdp.base_lin_vel(env)[..., :2]        # (B,2)
-
-    # 2) unit vector pointing from you → goal
-    to_goal = goal.to(env.device) - pos         # (B,2)
-    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
-
-    # 3) forward speed
-    speed = torch.norm(vel, dim=-1)             # (B,)
-
-    # 4) heading alignment (cosine of angle between vel & to_goal)
-    vel_norm = torch.nn.functional.normalize(vel, dim=-1)
-    cosine = (vel_norm * to_goal_norm).sum(dim=-1)  # in [–1,1]
-
-    # 5) return signed‐projection:   speed × cos(θ)
-    #    >0 if moving toward, <0 if moving away
-    return speed * cosine
-
 
 _prev_dists = None
 
@@ -107,6 +85,7 @@ def step_progress(env, goal=torch.tensor([4.0, 4.0])):
 ###################
 ###### SCENE ######
 ###################
+
 @configclass
 class DriftTerrainImporterCfg(TerrainImporterCfg):
 
@@ -145,7 +124,6 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    # ── South wall under /World/envs/env_i/wall_south ──
     wall_south = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_south",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -5.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
@@ -167,7 +145,6 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    # ── East wall under /World/envs/env_i/wall_east ──
     wall_east = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/wall_east",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[ 5.0, 0.0, 0.75], rot=[1.0, 0.0, 0.0, 0.0]),
@@ -217,7 +194,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
 #####################
 ###### EVENTS #######
 #####################
-# 1) global spin‐timer storage
+
 _spin_timers = None
 
 def reset_spin_timer(env, env_ids, duration: float = 1.0):
@@ -258,79 +235,10 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
     return torch.zeros(env.num_envs, device=env.device)
   
 
-
-# def randomize_goal(env, env_ids,
-#                    area=(-5,5,-5,5),
-#                    min_dist=1.0):
-#     """
-#     Move /World/envs/env_i/GoalMarker via its XFormPrim each reset.
-#     """
-#     stage = env.stage
-#     # obstacle positions for distance check
-#     obs_xform = XFormPrim(f"/World/envs/env_.*/Obstacle1", stage)
-#     # we'll re-instantiate per env below
-#     for i in env_ids.tolist():
-#         # get robot’s freshly‐set start pos
-#         rp = env.scene.articulations["robot"].data.root_pos_w[i,:2]
-#         obs_pt = obs_xform.get_world_pose(env_ids=[i])[:, :2][0]
-
-#         # rejection sample
-#         while True:
-#             gx = random.uniform(area[0], area[1])
-#             gy = random.uniform(area[2], area[3])
-#             pt = torch.tensor([gx,gy], device=env.device)
-#             if ( (pt - rp    ).norm() >= min_dist
-#                  and (pt - obs_pt ).norm() >= min_dist ):
-#                 break
-
-#         prim_path = f"/World/envs/env_{i}/GoalMarker"
-#         xform_goal = XFormPrim(prim_path, stage)
-#         xform_goal.set_world_pose(
-#             position=[gx, gy, 0.0],
-#             orientation=[1.0, 0.0, 0.0, 0.0],
-#             env_ids=[i],
-#         )
-#     return torch.zeros(env.num_envs, device=env.device)
-
-# # 3) RANDOMIZE ROBOT START
-# def randomize_robot_start(env, env_ids,
-#                           area=(-5,5,-5,5),
-#                           min_dist=1.0):
-#     """
-#     Pick a start for each env that’s ≥min_dist from the obstacle and the goal.
-#     Uses reset_root_state_new to actually teleport the car.
-#     """
-#     # get the current obstacle position in each env
-#     obs = env.scene.extras["obstacle1"]
-#     obs_pos = obs.get_world_pose(env_ids=env_ids)[:, :2]
-
-#     goal = torch.tensor([5.0, 5.0], device=env.device)
-#     for i in env_ids.tolist():
-#         while True:
-#             x = random.uniform(area[0], area[1])
-#             y = random.uniform(area[2], area[3])
-#             pt = torch.tensor([x,y], device=env.device)
-#             if ( (pt - obs_pos[i]).norm() >= min_dist
-#                  and (pt - goal    ).norm() >= min_dist ):
-#                 break
-
-#         # teleport it flat + identity yaw
-#         reset_root_state_new(
-#             env,
-#             torch.tensor([i], device=env.device),
-#             asset_cfg=SceneEntityCfg("robot"),
-#             pos=[x, y, 0.0],
-#             rot=[0.0, 0.0, 0.0, 1.0],
-#         )
-#     return torch.zeros(env.num_envs, device=env.device)
-
-
-
-
 # 4) RANDOMIZE GOAL
+
 @configclass
 class DriftEventsCfg:
-    # … your other reset terms …
 
     reset_spin_timer = EventTerm(
         func=reset_spin_timer,
@@ -342,13 +250,11 @@ class DriftEventsCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            # Sample local x uniformly in [-5,5], same for y, and keep z=0
             "pose_range": {
                 "x": (-4.5, 0.0),
                 "y": (-4.5, 0.0),
                 "z": (0.0, 0.0),
             },
-            # No initial velocity
             "velocity_range": {
                 "x":    (0.0, 0.0),
                 "y":    (0.0, 0.0),
@@ -357,7 +263,6 @@ class DriftEventsCfg:
                 "pitch":(0.0, 0.0),
                 "yaw":   (0.0, 0.0),
             },
-            # Target the robot articulation
             "asset_cfg": SceneEntityCfg("robot"),
         },
     )
@@ -365,7 +270,7 @@ class DriftEventsCfg:
     spin_in_place = EventTerm(
         func=spin_in_place,
         mode="interval",
-        interval_range_s=(0.005 * 10, 0.005 * 10),  # every physics step
+        interval_range_s=(0.005 * 10, 0.005 * 10),  
         params={"max_w": 6.0},
     )
 
@@ -374,23 +279,10 @@ class DriftEventsCfg:
         mode="reset",
     )
 
-    # Track distance progress
     reset_dist_progress = EventTerm(
         func=reset_dist_tracker,
         mode="reset",
     )
-
-    # )
-    # randomize_robot_start = EventTerm(
-    #     func=randomize_robot_start,
-    #     mode="reset",
-    #     params={"area":(-5,5,-5,5),"min_dist":2},
-    # )
-    # randomize_goal = EventTerm(
-    #     func=randomize_goal,
-    #     mode="reset",
-    #     params={"area":(-5,5,-5,5),"min_dist":2},
-    # )
 
 
 @configclass
@@ -456,47 +348,9 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 ###### REWARDS #######
 ######################
 
-W_MAX = 6.0    # max |yaw rate| (rad/s)
-V_MAX = 3.0    # max linear speed (m/s)
-D_MAX = (10**2 + 10**2)**0.5  # ≈7.07 m
+
 
 _turn_buffers = None
-_buf_params    = (None, None)
-
-def sustained_turn_reward(env, window_s: float = 1.0, tr: float = 0.1):
-    global _turn_buffers, _buf_params
-
-    # how many steps in window_s seconds
-    dt = env.cfg.sim.dt * 10
-    window_steps = max(1, int(window_s / dt))
-    N = env.num_envs
-
-    # init or resize buffers
-    if _turn_buffers is None or _buf_params != (window_steps, N):
-        _turn_buffers = [deque(maxlen=window_steps) for _ in range(N)]
-        _buf_params    = (window_steps, N)
-
-    out = torch.zeros(N, device=env.device)
-    w   = mdp.base_ang_vel(env)[..., 2].abs().clamp(max=W_MAX)
-
-    for i in range(N):
-        buf = _turn_buffers[i]
-        buf.append(float(w[i].cpu()))
-        if len(buf) == buf.maxlen:
-            avg_w = sum(buf) / buf.maxlen
-            if avg_w > tr:
-                # normalize [tr..W_MAX] → [0..1]
-                val = (avg_w - tr) / (W_MAX - tr)
-                out[i] = val
-
-    return out.clamp(0.0, 1.0)
-
-
-def instant_turn_reward(env, scale: float = 1.0):
-    w = mdp.base_ang_vel(env)[..., 2].abs().clamp(max=W_MAX)
-    out = (w / W_MAX) * scale
-    return out.clamp(0.0, 1.0)
-
 
 def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     pos = mdp.root_pos_w(env)[..., :2]
@@ -525,27 +379,6 @@ def goal_reached_reward(env, goal=torch.tensor([5.0,5.0]), threshold=0.3):
     dist = torch.norm(goal.to(env.device) - pos, dim=-1)
     out  = torch.where(dist < threshold, 1.0, 0.0)
     return out
-V_TRANS_MAX = 3.0  # max linear speed (m/s)
-
-def turn_in_place_reward(env):
-    """
-    Rewards yaw‐rate when the car is effectively not translating.
-    Output is normalized to [0,1].
-    """
-    # 1) get absolute yaw‐rate (rad/s)
-    w = mdp.base_ang_vel(env)[..., 2].abs()  # shape (B,)
-    w = w.clamp(max=W_MAX)
-
-    # 2) get translational speed (m/s)
-    vel = mdp.base_lin_vel(env)[..., :2]  # shape (B,2)
-    v = torch.norm(vel, dim=-1).clamp(max=V_TRANS_MAX)
-
-    # 3) translation penalty factor in [0,1]
-    #    = 1 when v=0 (pure spin), → 0 when v>=V_TRANS_MAX
-    trans_factor = (1.0 - v / V_TRANS_MAX).clamp(0.0, 1.0)
-
-    # 4) reward = (|w|/W_MAX) * trans_factor  ∈ [0,1]
-    return (w / W_MAX) * trans_factor
 
 
 def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
@@ -576,7 +409,7 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
 
     # 6) Normalize and raise to exponent → penalty ∈ [0,1]
     penalty = (delta / min_dist).pow(exponent)              # shape (B,)
-
+    penalty = -penalty -0.2
     return penalty
 
 
@@ -587,7 +420,7 @@ def flip_penalty(env):
       0 when flat, up to 1 when fully flipped.
     """
     # (w, x, y, z)
-    quat = mdp.root_quat_w(env)          # shape (B,4)
+    quat = mdp.root_quat_w(env)          
     qw, qx, qy, qz = quat.unbind(-1)
 
     # compute roll & pitch
@@ -598,7 +431,6 @@ def flip_penalty(env):
     sinp  = (2*(qw*qy - qz*qx)).clamp(-1.0, 1.0)
     pitch = torch.asin(sinp)
 
-    # normalize to [0,1]
     return -((roll.abs() + pitch.abs()) / math.pi).clamp(0.0, 1.0)
 
 @configclass
@@ -609,24 +441,14 @@ class TraverseABCfg:
         weight=20.0,
     )
 
-
-    # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
         weight=20,
     )
 
-    # keep your alive and reach terms if you want
     alive = RewTerm(func=mdp.rewards.is_alive, weight=1.0)
     reach = RewTerm(func=goal_reached_reward, weight=500.0)
 
-    # sustained turns (as before)
-    # sustained_turn = RewTerm(
-    #     func=sustained_turn_reward,
-    #     weight=10,
-    # )
-
-    
     flip_penalty = RewTerm(
         func=flip_penalty,
         weight=500,    
@@ -634,7 +456,7 @@ class TraverseABCfg:
     
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=5.0,         # tweak as needed
+        weight=5.0,         
         params={"min_dist": 0.3, "exponent": 2.0},
     )
 
@@ -668,8 +490,8 @@ def reached_goal(env, goal=[4.0, 4.0], thresh: float = 0.3):
     goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
     dist  = torch.norm(pos - goal, dim=-1)             # B]
     reached = dist < thresh
-    if torch.any(reached):
-        print("stopped with pos:", pos, "dist to goal", dist)
+    # if torch.any(reached):
+    #     print("stopped with pos:", pos, "dist to goal", dist)
     return reached
 
 @configclass
@@ -683,8 +505,6 @@ class GoalNavTerminationsCfg:
             "thresh": 0.3
         }
     )
-
-
 
 ######################
 ###### RL ENV ########
@@ -726,7 +546,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 10  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 15
-        self.actions.throttle.scale = (MAX_SPEED, 6)
+        self.actions.throttle.scale = (V_MAX, W_MAX)
 
         self.observations.policy.enable_corruption = True
 
