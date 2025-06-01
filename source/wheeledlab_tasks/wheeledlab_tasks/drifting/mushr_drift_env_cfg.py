@@ -458,7 +458,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 
 W_MAX = 6.0    # max |yaw rate| (rad/s)
 V_MAX = 3.0    # max linear speed (m/s)
-D_MAX = (5.0**2 + 5.0**2)**0.5  # ≈7.07 m
+D_MAX = (10**2 + 10**2)**0.5  # ≈7.07 m
 
 _turn_buffers = None
 _buf_params    = (None, None)
@@ -517,7 +517,6 @@ def distance_penalty(env, goal=torch.tensor([5.0,5.0])):
     pos  = mdp.root_pos_w(env)[...,:2]
     dist = torch.norm(goal.to(env.device)-pos, dim=-1).clamp(max=D_MAX)
     # normalize [0..D_MAX] → [1..0]
-    print(dist)
     return (1.0 - dist/D_MAX).clamp(0.0, 1.0)
 
 
