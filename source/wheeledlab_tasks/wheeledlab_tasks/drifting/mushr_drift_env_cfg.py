@@ -456,7 +456,7 @@ def velocity_toward_obstacle_penalty(
     pos_world = mdp.root_pos_w(env)[..., :2] + env.scene.env_origins[:, :2]
     print("pos_world", pos_world)
     # 3) Compute horizontal distance from robot to every beam (B, R)
-    dist_all = torch.norm(hits_w[..., :2] - pos_xy, dim=-1)  # (B, R)
+    dist_all = torch.norm(hits_w[..., :2] - pos_world, dim=-1)  # (B, R)
     d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
 
     # 4) Build mask of “too close” (only penalize if d_min < min_dist AND finite)
