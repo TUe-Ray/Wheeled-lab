@@ -411,7 +411,6 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
 
     to_goal      = goal.to(env.device) - pos
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
-    print("DIST TO GOAL", to_goal)
     speed    = torch.norm(vel, dim=-1).clamp(max=V_MAX)
     vel_norm = torch.nn.functional.normalize(vel + 1e-6, dim=-1)
     cosine   = (vel_norm * to_goal_norm).sum(dim=-1).clamp(-1.0,1.0)
