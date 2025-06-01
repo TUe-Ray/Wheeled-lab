@@ -256,75 +256,7 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
         )
 
     return torch.zeros(env.num_envs, device=env.device)
-# import omni.usd
-# from pxr import Usd
-
-# def randomize_obstacle_size(env, env_ids, size_range=(0.5, 2.0)):
-#     # grab the live stage exactly as the multi_asset.py demo does
-#     stage = omni.usd.get_context().get_stage()
-
-#     for i in env_ids.tolist():
-#         # compute your cuboid size…
-#         prim_path = f"/World/envs/env_{i}/Obstacle1"
-
-#         # ─── remove any old obstacle ───
-#         if stage.GetPrimAtPath(prim_path):
-#             stage.RemovePrim(prim_path)        # sample x,y,z half‐extents
-#         sx = random.uniform(*size_range)
-#         sy = random.uniform(*size_range)
-#         sz = random.uniform(*size_range)
-
-#         # make a new spawn‐cfg
-#         spawn_cfg = MeshCuboidCfg(
-#             size=(sx, sy, sz),
-#             collision_props=sim_utils.CollisionPropertiesCfg(
-#                 contact_offset=0.01,
-#                 rest_offset=0.0,
-#             ),
-#             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.8,0.2,0.2)),
-#         )
-
-#         # full prim path for that env
-#         prim = f"/World/envs/env_{i}/Obstacle1"
-#         # spawn it half‐buried so it sits on the ground
-#         spawn_cfg.func(
-#             prim,
-#             spawn_cfg,
-#             translation=[3.0, 0.0, sz * 0.5],
-#             orientation=[1.0, 0.0, 0.0, 0.0],
-#         )
-#     return torch.zeros(env.num_envs, device=env.device)
-# from pxr import Gf, UsdGeom
-# from isaaclab.sim.spawners.xform_prim import XFormPrim
-
-# def randomize_obstacle_pose(env, env_ids,
-#                             area=(-5,5,-5,5),
-#                             min_dist=1.0):
-#     """
-#     Move /World/envs/env_i/Obstacle1 via its XFormPrim each reset.
-#     """
-#     stage = env.stage
-#     start = torch.tensor([-2.0, -3.0], device=env.device)
-#     goal  = torch.tensor([ 5.0,  5.0], device=env.device)
-
-#     for i in env_ids.tolist():
-#         # rejection sample in the box
-#         while True:
-#             x = random.uniform(area[0], area[1])
-#             y = random.uniform(area[2], area[3])
-#             pt = torch.tensor([x,y], device=env.device)
-#             if (torch.norm(pt - start) >= min_dist
-#                 and torch.norm(pt - goal ) >= min_dist):
-#                 break
-
-#         prim_path = f"/World/envs/env_{i}/Obstacle1"
-#         xform = XFormPrim(prim_path, stage)
-#         xform.set_world_pose(
-#             position=[x, y, 0.0],
-#             orientation=[1.0, 0.0, 0.0, 0.0],
-#             env_ids=[i],
-#         )
-#     return torch.zeros(env.num_envs, device=env.device)
+  
 
 
 # def randomize_goal(env, env_ids,
@@ -438,15 +370,7 @@ class DriftEventsCfg:
         func=reset_dist_tracker,
         mode="reset",
     )
-    # randomize_obstacle_size = EventTerm(
-    #     func=randomize_obstacle_size,
-    #     mode="reset",
-    #     params={"size_range": (0.5,2.0)},
-    # )
-    # randomize_obstacle_pose = EventTerm(
-    #     func=randomize_obstacle_pose,
-    #     mode="reset",
-    #     params={"area":(-5,5,-5,5),"min_dist":2},
+
     # )
     # randomize_robot_start = EventTerm(
     #     func=randomize_robot_start,
