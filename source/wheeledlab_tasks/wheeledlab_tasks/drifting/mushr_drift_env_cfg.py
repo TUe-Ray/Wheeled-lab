@@ -567,7 +567,7 @@ class DriftCurriculumCfg:
     obstacle_penalty = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
-            "reward_term_name": "lidar_obstacle_penalty",
+            "reward_term_name": "obstacle_penalty",
             "increase": -54,
             "episodes_per_increase": 25,
             "max_increases": 4,
@@ -649,7 +649,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 10  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 15
+        self.episode_length_s = 20
         self.actions.throttle.scale = (V_MAX, W_MAX)
 
         self.observations.policy.enable_corruption = True
