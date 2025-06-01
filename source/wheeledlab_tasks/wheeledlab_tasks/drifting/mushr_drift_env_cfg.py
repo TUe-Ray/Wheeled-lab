@@ -61,7 +61,7 @@ def clear_turn_buffers(env, env_ids):
     # return a dummy tensor so IsaacLab is happy
     return torch.zeros(env.num_envs, device=env.device)
 
-def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
+def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
     # 1) world-frame position & velocity
     pos = mdp.root_pos_w(env)[..., :2]          # (B,2)
     vel = mdp.base_lin_vel(env)[..., :2]        # (B,2)
@@ -90,7 +90,7 @@ def reset_dist_tracker(env, env_ids):
     # no reward on reset
     return torch.zeros(env.num_envs, device=env.device)
 
-def step_progress(env, goal=torch.tensor([5.0, 5.0])):
+def step_progress(env, goal=torch.tensor([4.0, 4.0])):
     global _prev_dists
     pos = mdp.root_pos_w(env)[..., :2]           # (B,2)
     dists = torch.norm(goal.to(env.device) - pos + 0.00001, dim=-1)  # (B,)
@@ -131,7 +131,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     #robot: ArticulationCfg = MUSHR_SUS_2WD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     goal_marker = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/GoalMarker",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.0, 4.0, 0.0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[4.0, 4.0, 0.0]),
         spawn=SphereCfg(radius=0.2,
                         visual_material=PreviewSurfaceCfg(diffuse_color=(0.0,1.0,0.0))),
     )
@@ -335,7 +335,7 @@ class DriftEventsCfg:
     reset_spin_timer = EventTerm(
         func=reset_spin_timer,
         mode="reset",
-        params={"duration": 0.5},
+        params={"duration": 0.25},
     )
 
     reset_robot = EventTerm(
@@ -513,17 +513,11 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([5.0,5.0])):
     return out.clamp(-1.0, 1.0)
 
 
-def away_movement_penalty(env, goal=torch.tensor([5.0,5.0])):
-    proj = signed_velocity_toward_goal(env, goal=goal) * V_MAX
-    raw  = torch.clamp(-proj, min=0.0)
-    out  = raw / V_MAX
-    return out.clamp(0.0, 1.0)
-
-
 def distance_penalty(env, goal=torch.tensor([5.0,5.0])):
     pos  = mdp.root_pos_w(env)[...,:2]
     dist = torch.norm(goal.to(env.device)-pos, dim=-1).clamp(max=D_MAX)
     # normalize [0..D_MAX] → [1..0]
+    print(dist)
     return (1.0 - dist/D_MAX).clamp(0.0, 1.0)
 
 
@@ -565,10 +559,12 @@ def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
     # 1) pull out the front‐facing LiDAR hits
     lidar      = env.scene.sensors["ray_caster"]
     hits_w     = lidar.data.ray_hits_w              # (B, R, 3)
+    print("hits", hits_w)
     positions  = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # (B, 1, 2)
-
+    print("positions", positions)
     # 2) compute horizontal distance to each hit
     dist       = torch.norm(hits_w[..., :2] - positions, dim=-1)  # (B, R)
+    print("dist", dist)
     # 3) how much inside the “safe” radius?
     delta      = (min_dist - dist).clamp(min=0.0)  # (B, R)
 
@@ -608,16 +604,11 @@ class TraverseABCfg:
         weight=20.0,
     )
 
-    # penalize any movement away
-    away_penalty = RewTerm(
-        func=away_movement_penalty,
-        weight=0.2,
-    )
 
     # penalize simply “parking” far from the goal
     dist_penalty = RewTerm(
         func=distance_penalty,
-        weight=5,
+        weight=20,
     )
 
     # keep your alive and reach terms if you want
@@ -667,7 +658,7 @@ class DriftCurriculumCfg:
 ###### TERMINATION #######
 ##########################
 
-def reached_goal(env, goal=[5.0, 5.0], thresh: float = 0.3):
+def reached_goal(env, goal=[4.0, 4.0], thresh: float = 0.3):
     pos   = mdp.root_pos_w(env)[..., :2]               # B x 2
     goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  # 1 x 2
     dist  = torch.norm(pos - goal, dim=-1)             # B]
@@ -683,7 +674,7 @@ class GoalNavTerminationsCfg:
     goal_reached = DoneTerm(
         func=reached_goal,
         params={
-            "goal": [5.0, 5.0],  # Point B
+            "goal": [4.0, 4.0],  # Point B
             "thresh": 0.3
         }
     )
