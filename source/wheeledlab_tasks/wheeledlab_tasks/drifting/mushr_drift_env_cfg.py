@@ -460,6 +460,7 @@ def velocity_toward_obstacle_penalty(
 
     # 3) Compute horizontal distance from robot to every beam (B, R)
     dist_all = torch.norm(hits_w[..., :2] - pos_xy, dim=-1)  # (B, R)
+    print(dist_all)
     d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
 
     # 4) Build mask of “too close” (only penalize if d_min < min_dist AND finite)
@@ -487,7 +488,7 @@ def velocity_toward_obstacle_penalty(
     # 8) Build the final penalty vector (B,).  Zero by default; fill in where mask_close
     penalty = torch.zeros_like(d_min)  # (B,)
     if mask_close.any():
-        norm_speed = (speed_toward[mask_close] / V_MAX).clamp(max=1.0)  # (n_close,)
+        norm_speed = (speed_toward[mask_close]).clamp(max=1.0)  # (n_close,)
         penalty[mask_close] = norm_speed.pow(exponent)                 # (n_close,)
 
     return -penalty
@@ -527,16 +528,16 @@ class TraverseABCfg:
     )
 
     alive = RewTerm(func=mdp.rewards.is_alive, weight=0.1)
-    reach = RewTerm(func=goal_reached_reward, weight=500.0)
+    reach = RewTerm(func=goal_reached_reward, weight=1000.0)
     
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=50.0,         
+        weight=500.0,         
         params={"min_dist": 0.3, "exponent": 2.0},
     )
     velocity_toward_obstacle_penalty =    RewTerm(
         func= velocity_toward_obstacle_penalty,
-        weight= 10.0,         
+        weight= 100.0,         
         params={"min_dist": 0.5, "exponent": 2.0},
     )
 
@@ -569,7 +570,7 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "lidar_obstacle_penalty",
-            "increase": -5,
+            "increase": -50,
             "episodes_per_increase": 50,
             "max_increases": 8,
         },
