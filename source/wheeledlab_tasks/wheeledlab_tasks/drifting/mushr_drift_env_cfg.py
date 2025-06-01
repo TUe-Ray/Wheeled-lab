@@ -70,7 +70,7 @@ def reset_dist_tracker(env, env_ids):
 
 def step_progress(env, goal=torch.tensor([4.0, 4.0])):
     global _prev_dists
-    pos = mdp.root_pos_w(env)[..., :2]           # (B,2)
+    pos = mdp.root_pos_w(env)[..., :2]           
     dists = torch.norm(goal.to(env.device) - pos + 0.00001, dim=-1)  # (B,)
 
     if _prev_dists is None:
@@ -457,6 +457,9 @@ def velocity_toward_obstacle_penalty(
     pos_xy = mdp.root_pos_w(env)[..., :2]   # (B, 2)
     pos_xy = pos_xy.unsqueeze(1)            # (B, 1, 2)
     print("posxy", pos_xy)
+    env_origins = env.scene.env_origins                    # (B,3), e.g. [(0,0,0), (11,0,0)]
+    pos_world  = pos_xy + env_origins[:, :2]   
+    print("pos_world", pos_world)
     # 3) Compute horizontal distance from robot to every beam (B, R)
     dist_all = torch.norm(hits_w[..., :2] - pos_xy, dim=-1)  # (B, R)
     d_min, idx_min = dist_all.min(dim=-1)                     # both shape (B,)
@@ -530,7 +533,7 @@ class TraverseABCfg:
     
     obstacle_penalty = RewTerm(
         func=lidar_obstacle_penalty,
-        weight=500.0,         
+        weight=250.0,         
         params={"min_dist": 0.75, "exponent": 2.0},
     )
     velocity_toward_obstacle_penalty =    RewTerm(
@@ -570,7 +573,7 @@ class DriftCurriculumCfg:
             "reward_term_name": "lidar_obstacle_penalty",
             "increase": -50,
             "episodes_per_increase": 50,
-            "max_increases": 8,
+            "max_increases": 4,
         },
     )
 
