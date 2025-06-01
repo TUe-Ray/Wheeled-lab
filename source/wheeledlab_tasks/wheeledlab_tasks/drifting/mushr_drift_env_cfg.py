@@ -332,7 +332,11 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 class DriftEventsCfg:
     # … your other reset terms …
 
-
+    reset_spin_timer = EventTerm(
+        func=reset_spin_timer,
+        mode="reset",
+        params={"duration": 0.5},
+    )
 
     reset_robot = EventTerm(
         func=mdp.reset_root_state_uniform,
