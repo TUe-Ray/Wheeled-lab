@@ -332,25 +332,30 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
 class DriftEventsCfg:
     # … your other reset terms …
 
-    reset_spin_timer = EventTerm(
-        func=reset_spin_timer,
-        mode="reset",
-        params={"duration": 1.0},
-    )
 
-    reset_root_state = EventTerm(
-        func=reset_root_state_new,
+
+    reset_robot = EventTerm(
+        func=reset_root_state_uniform,
         mode="reset",
         params={
+            # Sample local x uniformly in [-5,5], same for y, and keep z=0
+            "pose_range": {
+                "x": (-5.0, 5.0),
+                "y": (-5.0, 5.0),
+                "z": (0.0, 0.0),
+            },
+            # No initial velocity
+            "velocity_range": {
+                "x":    (0.0, 0.0),
+                "y":    (0.0, 0.0),
+                "z":    (0.0, 0.0),
+                "roll": (0.0, 0.0),
+                "pitch":(0.0, 0.0),
+                "yaw":   (0.0, 0.0),
+            },
+            # Target the robot articulation
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [-2.0, -3.0, 0.0],
-            "rot": [0.0, 0.0, 0.0, 1.0],
         },
-    )
-
-    clear_turn_buffers = EventTerm(
-        func=clear_turn_buffers,
-        mode="reset",
     )
 
     spin_in_place = EventTerm(
