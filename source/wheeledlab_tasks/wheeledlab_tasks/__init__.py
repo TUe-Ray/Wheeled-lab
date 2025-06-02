@@ -48,7 +48,7 @@ gym.register(
 )
 
 gym.register(
-    id="IsaacLab-OriginOne",
+    id="IsaacLab-OriginOneNavigation",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
