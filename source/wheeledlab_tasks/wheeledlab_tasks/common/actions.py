@@ -53,8 +53,6 @@ from wheeledlab.envs.mdp import DifferentialDriveActionCfg
 @configclass
 class SkidSteerActionCfg:
     throttle = DifferentialDriveActionCfg(
-        # These are the joint names that control forward/backward motion
-        # for the left and right sides of your robot
         left_wheel_joint_names=[
             "front_left_wheel_throttle",
             "back_left_wheel_throttle",
@@ -64,9 +62,8 @@ class SkidSteerActionCfg:
             "back_right_wheel_throttle",
         ],
         wheel_radius=0.12,
-        wheel_base=0.5,        # Distance between left and right wheels
-        # command_type="velocity",  # or "effort", depending on how your URDF/SDF is set up
-        scale=(1.0, 1.0),         # Max linear and angular velocity (optional)
+        wheel_base=0.5,   
+        scale=(1.0, 1.0),         
         bounding_strategy="clip",
         no_reverse=False,
         asset_name="robot",
@@ -78,9 +75,8 @@ class OriginActionCfg:
         left_wheel_joint_names = ["left_front_wheel_joint", "left_rear_wheel_joint"],
         right_wheel_joint_names = ["right_front_wheel_joint", "right_rear_wheel_joint"],
         wheel_radius=0.12,
-        wheel_base=0.5,        # Distance between left and right wheels
-        # command_type="velocity",  # or "effort", depending on how your URDF/SDF is set up
-        scale=(1.0, 1.0),         # Max linear and angular velocity (optional)
+        wheel_base=0.5,       
+        scale=(1.0, 1.0),   
         bounding_strategy="clip",
         no_reverse=False,
         asset_name="robot",

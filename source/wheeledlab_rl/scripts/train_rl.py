@@ -2,19 +2,11 @@
 ###################################
 ###### BEGIN ISAACLAB SPINUP ######
 ###################################
-print('here then?')
 from wheeledlab_rl.startup import startup
 import argparse
-print(" importing is done")
 parser = argparse.ArgumentParser(description="Train an RL Agent in WheeledLab.")
-print(" parsed")
 parser.add_argument('-r', "--run-config-name", type=str, default="RSS_DRIFT_CONFIG", help="Run in headless mode.")
-print("configured")
-#parser.add_argument('-r', "--run-config-name", type=str, default="RSS_LEV_CONFIG", help="Run in headless mode.")
-print("at least you got here")
-
 simulation_app, args_cli = startup(parser=parser)
-print(" past startup")
 #######################
 ###### END SETUP ######
 #######################

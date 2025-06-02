@@ -5,9 +5,8 @@ import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg
 
 
-# Optional: adjust if you have a constants file for radius
 WHEEL_RADIUS = 0.1175
-MAX_WHEEL_SPEED = 2  # [m/s] or whatever your robot supports
+MAX_WHEEL_SPEED = 2  
 
 OriginRobotCfg = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
