@@ -327,8 +327,8 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         func=mdp.randomize_rigid_body_material,
         mode="startup",
         params={
-            "static_friction_range": (0.6, 0.7),
-            "dynamic_friction_range": (0.4, 0.5),
+            "static_friction_range": (0.4, 0.7),
+            "dynamic_friction_range": (0.2, 0.6),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
             "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"), #body_names=".*wheel_link"),
@@ -374,7 +374,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot",  body_names=["main_body"]), #body_names=["base_link"]), #
-            "mass_distribution_params": (0.1, 0.2),
+            "mass_distribution_params": (0.05, 0.25),
             "operation": "add",
             "distribution": "uniform",
         },
@@ -564,7 +564,7 @@ class TraverseABCfg:
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
         weight=200,
-        params={"min_dist": 1a, "exponent": 2.0, "distance_weight": 0.2},
+        params={"min_dist": 1, "exponent": 2.0, "distance_weight": 0.2},
     )
 
     forward_bonus = RewTerm(
