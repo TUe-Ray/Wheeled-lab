@@ -473,7 +473,7 @@ class NavigationCurriculumCfg:
         params={
             "reward_term_name": "dist_bonus",
             "increase": -5,
-            "episodes_per_increase": 30,
+            "episodes_per_increase": 15,
             "max_increases": 3,
         },
     )
@@ -482,7 +482,7 @@ class NavigationCurriculumCfg:
         params={
             "reward_term_name": "forward_bonus",
             "increase": -3,
-            "episodes_per_increase": 10,
+            "episodes_per_increase": 5,
             "max_increases": 3,
         },
     )
