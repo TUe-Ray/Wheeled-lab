@@ -7,7 +7,7 @@ from wheeledlab_rl.configs import (
 @configclass
 class RSS_NAV_CONFIG(RslRlRunConfig):
     env_setup = EnvSetup(
-        num_envs=512,
+        num_envs=256,
         task_name="IsaacLab-OriginOneNavigation"
     )
     train = RLTrainConfig(
