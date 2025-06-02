@@ -395,7 +395,7 @@ def goal_reached_reward(env, goal=torch.tensor([4.0, 4.0]), threshold: float = 0
 
     if just_reached.any():
         out[just_reached] = 1.0
-        time_left = (env.episode_length_s - elapsed_seconds).clamp(min=0.0)  
+        time_left = (env.cfg.episode_length_s - elapsed_seconds).clamp(min=0.0) 
         out[just_reached] += time_left[just_reached]
         _time_left_paid[just_reached] = True
 

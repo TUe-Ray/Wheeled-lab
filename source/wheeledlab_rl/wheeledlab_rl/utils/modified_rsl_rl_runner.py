@@ -72,10 +72,6 @@ class OnPolicyRunner(runners.OnPolicyRunner):
 
         for it in tqdm(range(start_iter, tot_iter)):
             start = time.time()
-            # Rollout
-
-            print("HERE is the check!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-
             if obs.isnan().any():
                 raise ValueError("NaN in the initial observation (obs)")
             if critic_obs.isnan().any():
@@ -139,5 +135,7 @@ class OnPolicyRunner(runners.OnPolicyRunner):
                 if not self.no_wandb:
                     self.log(locals())
                 if it % self.save_interval == 0:
-                    self.save(os.path.join(self.log_dir, "models", f"model_{it}.pt"))
+                    model_path = os.path.join(self.log_dir, "models", f"model_{it}.pt")
+                    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                    torch.save(self.alg.policy.actor, model_path)
             ep_infos.clear()
