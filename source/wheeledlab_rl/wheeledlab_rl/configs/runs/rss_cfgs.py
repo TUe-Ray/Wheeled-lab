@@ -26,7 +26,7 @@ class RSS_DRIFT_CONFIG(RslRlRunConfig):
 @configclass
 class RSS_NAV_CONFIG(RslRlRunConfig):
     env_setup = EnvSetup(
-        num_envs=1024,            
+        num_envs=256,            
         task_name="Isaac-MushrNavRL-v0",     
     )
     train = RLTrainConfig(
@@ -34,7 +34,7 @@ class RSS_NAV_CONFIG(RslRlRunConfig):
         rl_algo_lib="rsl",
         rl_algo_class="ppo",
         log=LogConfig(
-            video_interval=5000,
+            video_interval=10000,
         ),
     )
     agent_setup = AgentSetup(

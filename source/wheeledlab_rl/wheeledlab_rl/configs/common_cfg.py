@@ -15,12 +15,12 @@ class LogConfig:
     '''
     logs_dir: str = WHEELEDLAB_RL_LOGS_DIR              # Directory for creating logs (if log_dir is not provided)
     no_log: bool = False                                # Disable logging
-    log_every: int = 10                                 # Log every n updates
+    log_every: int = 200                                 # Log every n updates
     video: bool = True                                  # Record videos during training
-    video_length: int = 1000                             # Length of the recorded video (in steps)
-    video_interval: int = 5000                          # Interval between video recordings (in steps)
+    video_length: int = 1000                            # Length of the recorded video (in steps)
+    video_interval: int = 50000                          # Interval between video recordings (in steps)
     no_checkpoints: bool = False                        # Disable saving checkpoints
-    checkpoint_every: int = 1000                        # Save checkpoint every n updates
+    checkpoint_every: int = 10000                        # Save checkpoint every n updates
     no_wandb: bool = False                              # Disable wandb logging
     wandb_project: str = "WheeledLab"                   # Wandb project name
     test_mode: bool = False                             # Test mode (disable logging, wandb, video, checkpoints). Overrides other flags

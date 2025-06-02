@@ -21,7 +21,7 @@ class RslRlRunConfig(RunConfig):
     agent_setup: AgentSetup = AgentSetup(
         entry_point="rsl_rl_cfg_entry_point"
     )
-    train.log.video_interval = 15000
+    train.log.video_interval = 30000 #15000
     train.set_env_step = train.load_run_checkpoint
 
 @configclass

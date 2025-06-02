@@ -114,6 +114,9 @@ def main(run_cfg: RunConfig): # TODO: Add SB3 config support
             "video_crf": log_cfg.video_crf,
         }
         print("[INFO] Recording videos during training.")
+        print("[DEBUG] run_cfg.train.log.video_interval =", run_cfg.train.log.video_interval)
+        print("[DEBUG] run_cfg.env_setup.num_envs =", run_cfg.env_setup.num_envs)
+
         print_dict(video_kwargs, nesting=4)
         env = CustomRecordVideo(env, **video_kwargs)
 

@@ -25,7 +25,6 @@ from .mdp import  reset_root_state_new
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 
 
-
 ##############################
 ###### COMMON CONSTANTS ######
 ##############################
@@ -98,10 +97,10 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
             channels=1,
             vertical_fov_range=(0,0) ,
             horizontal_fov_range=(-180.0, 180.0),
-            horizontal_res=1.0
+            horizontal_res=12.0
         ),
         
-        debug_vis=True,
+        debug_vis=False,
     )
 
 
@@ -124,13 +123,11 @@ class DriftEventsCfg:
         func=reset_root_state_new,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "pos": [4, 0, 0.0],
+            "pos": [6.5, 0, 0.0],
             "rot": [0.0, 0.0, 0.0, 1.0], # no initial yaw
         },
         mode="reset",
     )
-
-
 
 @configclass
 class DriftEventsRandomCfg(DriftEventsCfg):
@@ -196,162 +193,18 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 ###### REWARDS #######
 ######################
 
-def track_progress_rate(env):
-    '''Estimate track progress by positive z-axis angular velocity around the environment'''
-    asset : RigidObject = env.scene[SceneEntityCfg("robot").name]
-    root_ang_vel = asset.data.root_link_ang_vel_w # this is different than the mdp one
-    progress_rate = root_ang_vel[..., 2]
-    return progress_rate
 
-def vel_dist(env, speed_target: float=MAX_SPEED, offset: float=-MAX_SPEED**2):
-    lin_vel = mdp.base_lin_vel(env)
-    ground_speed = torch.norm(lin_vel[..., :2], dim=-1)
-    speed_dist = (ground_speed - speed_target) ** 2 + offset
-    return speed_dist # speed target
-
-def cross_track_dist(env,
-                    straight: float,
-                    track_radius: float=(CORNER_IN_RADIUS + CORNER_OUT_RADIUS) / 2,
-                    offset: float= -1.,
-                    p: float=1.0):
-    """Measures distance from a given radius on the track. Defaults
-             to the middle of the track."""
-    poses = mdp.root_pos_w(env)
-    on_straights = torch.abs(poses[...,1]) < straight
-    sq_ctd = torch.where(on_straights,
-                torch.where(poses[...,0] > 0, # Straights
-                    (poses[...,0] - track_radius)**2, # Quadrant 1
-                    (poses[...,0] + track_radius)**2), # Quadrant 2
-                torch.where(poses[...,1] > 0, # Corners
-                    (torch.sqrt((poses[...,1] - straight)**2 + poses[...,0]**2) - track_radius)**2, # Positive y Turn
-                    (torch.sqrt((poses[...,1] + straight)**2 + poses[...,0]**2) - track_radius)**2 # Negative y Turn
-                )
-    )
-    ctd = torch.sqrt(sq_ctd) + offset
-
-    return torch.pow(ctd, p)
-
-def energy_through_turn(env, straight: float):
-    poses = mdp.root_pos_w(env)
-    speed = torch.norm(mdp.base_lin_vel(env), dim=-1)
-    energy_through_turn = torch.where(torch.abs(poses[...,1]) > straight, speed**2, 0.)
-    return energy_through_turn
-
-def in_range(env, straight, corner_in_radius):
-    poses = mdp.root_pos_w(env)
-    penalty = torch.where(torch.abs(poses[...,1]) < straight,
-                torch.where(torch.abs(poses[...,0]) < corner_in_radius, 1, 0),
-                torch.where(poses[...,1] > 0,
-                    torch.where((poses[...,1] - straight)**2 + poses[...,0]**2 < corner_in_radius**2, 1, 0),
-                    torch.where((poses[...,1] + straight)**2 + poses[...,0]**2 < corner_in_radius**2, 1, 0)))
-    return penalty
-
-def off_track(env, straight, corner_out_radius):
-    poses = mdp.root_pos_w(env)
-    penalty = torch.where(torch.abs(poses[...,1]) < straight,
-                torch.where(torch.abs(poses[...,0]) > corner_out_radius, 1, 0),
-                torch.where(poses[...,1] > 0,
-                    torch.where((poses[...,1] - straight)**2 + poses[...,0]**2 > corner_out_radius**2, 1, 0),
-                    torch.where((poses[...,1] + straight)**2 + poses[...,0]**2 > corner_out_radius**2, 1, 0)))
-    return penalty
-
-def side_slip(env, min_thresh: float, max_thresh: float, min_vel_x: float=0.5):
-    vel = mdp.base_lin_vel(env)
-    slip_angle = torch.abs(torch.atan2(vel[...,1], vel[...,0]))
-    valid_angle = torch.where(torch.logical_or(
-        torch.abs(vel[..., 0]) < min_vel_x, slip_angle > max_thresh),
-        0.0, slip_angle
-    )
-    # Discount lateral vel from steering
-    valid_angle = torch.where(valid_angle < min_thresh, 0.0, valid_angle)
-    # Clamp unstable angles. Harder than zeroing for heavy, unstable vehicles
-    # valid_angle = torch.clamp(valid_angle, max=max_thresh)
-    return valid_angle
-
-def turn_left_go_right(env, ang_vel_thresh: float=torch.pi/4):
-    asset = env.scene[SceneEntityCfg("robot").name]
-    steer_joints = asset.find_joints(".*_steer")[0]
-    steer_joint_pos = mdp.joint_pos(env)[..., steer_joints].mean(dim=-1)
-    ang_vel = mdp.base_ang_vel(env)[..., 2]
-    ang_vel = torch.clamp(ang_vel, max=ang_vel_thresh, min=-ang_vel_thresh)
-    tlgr = steer_joint_pos * ang_vel * -1.
-    rew = torch.clamp(tlgr, min=0.)
-    return rew
-
-def move_towards_goal(env, goal=torch.tensor([5.0, 5.0]), scale=1.0):
-#    pos = mdp.root_pos_w(env)[..., :2]
-#    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    # ensure goal is a tensor on the correct device
-    goal = torch.as_tensor(goal, device=env.device)
-    pos  = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal - pos, dim=-1)
-    return torch.exp(-dist / scale)
-
-def lidar_obstacle_penalty(env, min_dist=0.3):
-    """
-    Penalize if obstacle is closer than min_dist in front of robot.
-    """
-    lidar: RayCaster = env.scene.sensors["ray_caster"]
-    hits = lidar.data.ray_hits_w  # (B x rays x 3)
-    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
-    dist = torch.norm(hits[..., :2] - robot_pos, dim=-1)  # B x rays
-    close_hits = (dist < min_dist).float()
-    return -close_hits.sum(dim=-1)
-
-def low_speed_penalty(env, low_speed_thresh: float=0.3):
-    lin_speed = torch.norm(mdp.base_lin_vel(env), dim=-1)
-    pen = torch.where(lin_speed < low_speed_thresh, 1., 0.)
-    return pen
-
-def forward_vel(env):
-    return mdp.base_lin_vel(env)[:, 0]
-
-def goal_direction_alignment(env, goal=torch.tensor([5.0, 5.0])):
-    goal = torch.as_tensor(goal, device=env.device)
-    pos = mdp.root_pos_w(env)[..., :2]  # B x 2
-    vel = mdp.base_lin_vel(env)[..., :2]  # B x 2
-    to_goal = goal - pos  
-    #to_goal = goal.to(env.device) - pos  # B x 2
-    to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
-    vel_norm = torch.nn.functional.normalize(vel, dim=-1)
-    dot = (to_goal_norm * vel_norm).sum(dim=-1)  # B
-    return dot  # +1 when aligned, -1 when opposite
-
-def time_efficiency(env, goal=torch.tensor([5.0, 5.0]), reached_thresh=0.2):
-    # current step number (scalar)
-    goal = torch.as_tensor(goal, device=env.device)
-    step = max(int(env.common_step_counter), 1)
-    pos = mdp.root_pos_w(env)[..., :2]
-    #dist_to_goal = torch.norm(goal.to(env.device) - pos, dim=-1)
-    dist_to_goal = torch.norm(goal - pos, dim=-1)
-    reached = dist_to_goal < reached_thresh
-    # constant scalar divisor broadcasts to (B,)
-    return reached.float() / float(step)
-
-
-def min_lidar_distance_penalty(env, threshold=0.5):
-    lidar: RayCaster = env.scene.sensors["ray_caster"]
-    hits = lidar.data.ray_hits_w  # (B x rays x 3)
-    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)  # B x 1 x 2
-    dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
-    min_dist = torch.min(dists, dim=-1)[0]  # B
-    return torch.where(min_dist < threshold, -1.0 + min_dist / threshold, torch.zeros_like(min_dist))
-
-def collision_penalty_contact_sensor(env, threshold=5.0):
-    contact_sensor = env.scene.sensors["contact_sensor"]
-    net_forces = contact_sensor.data.net_forces_w_history  # B x T x N x 3
-    force_magnitudes = torch.norm(net_forces, dim=-1)  # B x T x N
-    max_force = torch.max(force_magnitudes, dim=(1, 2))[0]
-    return torch.where(max_force > threshold, -1.0, torch.zeros_like(max_force))
-
-def smooth_velocity_change(env):
-    vel = mdp.base_lin_vel(env)
-    delta = vel - env.prev_vel  # requires env.prev_vel to be tracked manually
-    return -torch.norm(delta, dim=-1)
-
-def low_angular_velocity(env):
-    ang_vel = mdp.base_ang_vel(env)
-    return -torch.abs(ang_vel[..., 2])  # Penalize yaw
+def move_towards_goal(env, goal=torch.tensor([-4.0, 0.0]), scale=1.0, vel_weight=0.5):
+    goal = torch.as_tensor(goal, dtype=torch.float32, device=env.device)  
+    pos_xy = mdp.root_pos_w(env)[..., :2] 
+    vec_to_goal = goal - pos_xy      
+    dist = torch.norm(vec_to_goal, dim=-1) 
+    dist_reward = torch.exp(-dist / scale)  
+    vel_xy = mdp.root_lin_vel_w(env)[..., :2] 
+    inv_dist = 1.0 / (dist.unsqueeze(-1) + 1e-6)  
+    unit_to_goal = vec_to_goal * inv_dist 
+    vel_proj = (vel_xy * unit_to_goal).sum(dim=-1)  
+    return dist_reward + vel_weight * vel_proj
 
 def goal_reached_reward(env, goal=[5.0,5.0], threshold=0.3):
     # turn the goal list into a tensor on the right device
@@ -359,9 +212,6 @@ def goal_reached_reward(env, goal=[5.0,5.0], threshold=0.3):
     pos  = mdp.root_pos_w(env)[..., :2]
     dist = torch.norm(goal - pos, dim=-1)
     return (dist < threshold).float()
-
-
-
 
 ########################
 ###### CURRICULUM ######
@@ -380,16 +230,6 @@ class DriftCurriculumCfg:
         }
     )
 
-#    more_tlgr = CurrTerm(
-#        func=increase_reward_weight_over_time,
-#        params={
-#            "reward_term_name": "tlgr",
-#            "increase": 10.,
-#            "episodes_per_increase": 20,
-#            "max_increases": 5,
-#        }
-#    )
-
     more_term_pens = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
@@ -403,14 +243,6 @@ class DriftCurriculumCfg:
 ##########################
 ###### TERMINATION #######
 ##########################
-
-def cart_off_track(env, straight:float, corner_in_radius:float, corner_out_radius:float):
-    out = torch.logical_or(
-        off_track(env, straight, corner_out_radius) > 5,
-        in_range(env, straight, corner_in_radius) > 5
-    )
-    return out
-
 
 def reached_goal(env, goal=[5.0,5.0], threshold=0.3):
     # turn the goal list into a tensor on the right device
@@ -440,24 +272,58 @@ class GoalNavTerminationsCfg:
         time_out=False     
     )
 
+def min_lidar_distance_penalty(env, threshold: float = 0.5):
+
+    lidar = env.scene.sensors["ray_caster"]
+    hits = lidar.data.ray_hits_w
+    robot_pos = mdp.root_pos_w(env)[..., :2].unsqueeze(1)
+    dists = torch.norm(hits[..., :2] - robot_pos, dim=-1)
+    min_dist = dists.amin(dim=-1)
+    return torch.where(
+        min_dist < threshold,
+        -1.0 + min_dist / threshold,
+        torch.zeros_like(min_dist),
+    )
+
+def low_speed_penalty(env, low_speed_thresh: float = 0.3):
+    vel_local = mdp.base_lin_vel(env)[..., 0]  
+    return torch.where(
+        vel_local.abs() < low_speed_thresh,  
+        torch.ones_like(vel_local),
+        torch.zeros_like(vel_local),
+    )
+
+def forward_vel(env):
+    return mdp.base_lin_vel(env)[:, 0]
+
 @configclass
 class NavRewardsCfg:
     move_to_goal = RewTerm(
         func=move_towards_goal,
-        weight=10.0,
+        weight=1.0,    
         params={
             "goal": [-4, 0],   
-            "scale": 1.0,
+            "scale": 2.0,         
+            "vel_weight": 0.3     
         },
     )
 
     reach_goal = RewTerm(
         func=goal_reached_reward,
-        weight=100.0,
-        params={
-            "goal": [-4, 0],     
-            "threshold": 0.5,      
-        },
+        weight=100.0, 
+        params={"goal": [-4, 0], "threshold": 0.5},
+    )
+
+    obstacle_penalty = RewTerm(
+        func=min_lidar_distance_penalty,
+        weight=20.0,   
+        params={"threshold": 1.0},  
+    )
+
+    low_speed_penalty = RewTerm(
+        func=low_speed_penalty,  
+        weight=-5.0,             
+        params={"low_speed_thresh": 0.3},
     )
 
 ######################
@@ -470,21 +336,18 @@ class MushrNavRLEnvCfg(ManagerBasedRLEnvCfg):
 
     seed: int = 42
     num_envs: int = 1024
-    env_spacing: float = 0.
+    env_spacing: float = 0
 
-    # Basic Settings
-    #observations: BlindObsCfg = BlindObsCfg()
     observations: NavObsCfg = NavObsCfg()
-
-    # actions: MushrRWDActionCfg = MushrRWDActionCfg()
-    #actions: SkidSteerActionCfg = SkidSteerActionCfg()
     actions: OriginActionCfg = OriginActionCfg()
 
     # MDP Settings
     rewards: NavRewardsCfg      = NavRewardsCfg()
-    events: DriftEventsCfg = DriftEventsRandomCfg()
+    #events: DriftEventsCfg = DriftEventsRandomCfg()
+    events: DriftEventsCfg      = DriftEventsCfg()
     terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
-    curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
+    #curriculum: DriftCurriculumCfg = DriftCurriculumCfg()
+    curriculum: None
 
     def __post_init__(self):
         """Post initialization."""
@@ -495,7 +358,7 @@ class MushrNavRLEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.eye = [10., -10., 10.]
         self.viewer.lookat = [0.0, 0.0, 0.]
 
-        self.sim.dt = 0.005  # 200 Hz
+        self.sim.dt = 0.005  # 200 Hz --> 0.005
         self.decimation = 4  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
         self.episode_length_s = 20
