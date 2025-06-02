@@ -21,11 +21,9 @@ from isaaclab.managers import (
 )
 
 from wheeledlab.envs.mdp import increase_reward_weight_over_time
-from wheeledlab_assets import MUSHR_SUS_2WD_CFG
-from wheeledlab_tasks.common import ObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
+from wheeledlab_tasks.common import ObsCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
-from wheeledlab_assets import MUSHR_SUS_2WD_CFG
-from .mdp import reset_root_state_along_track, reset_root_state_new
+from .mdp import reset_root_state_along_track
 from functools import partial
 import math 
 ##############################
@@ -672,14 +670,26 @@ class MushrDriftPlayEnvCfg(MushrDriftRLEnvCfg):
 
     events: DriftEventsCfg = DriftEventsRandomCfg(
         reset_robot = EventTerm(
-            func=reset_root_state_along_track,
-            params={
-                "dist_noise": 0.,
-                "yaw_noise": 0.,
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {
+                "x": (-4.5, 0.0),
+                "y": (-4.5, 0.0),
+                "z": (0.0, 0.0),
             },
-            mode="reset",
-        )
-    )
+            "velocity_range": {
+                "x":    (0.0, 0.0),
+                "y":    (0.0, 0.0),
+                "z":    (0.0, 0.0),
+                "roll": (0.0, 0.0),
+                "pitch":(0.0, 0.0),
+                "yaw":   (0.0, 0.0),
+            },
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    ))
+
 
     rewards: TraverseABCfg = None
     terminations: GoalNavTerminationsCfg = None

@@ -7,6 +7,8 @@ import gymnasium as gym
 from .drifting import MushrDriftRLEnvCfg, MushrDriftPlayEnvCfg
 from .visual import MushrVisualRLEnvCfg, MushrVisualPlayEnvCfg
 from .elevation import MushrElevationRLEnvCfg, MushrElevationPlayEnvCfg
+from .navigation import OriginOneNavRLEnvCfg, OriginOneNavigationPlayEnvCfg
+import wheeledlab_tasks.navigation.config.agents.mushr as originone_nav_agents
 import wheeledlab_tasks.drifting.config.agents.mushr as mushr_drift_agents
 import wheeledlab_tasks.visual.config.agents.mushr as mushr_visual_agents
 import wheeledlab_tasks.elevation.config.agents.mushr as mushr_elevation_agents
@@ -42,5 +44,16 @@ gym.register(
         "env_cfg_entry_point": MushrElevationRLEnvCfg,
         "rsl_rl_cfg_entry_point": f"{mushr_elevation_agents.__name__}.rsl_rl_ppo_cfg:MushrPPORunnerCfg",
         "play_env_cfg_entry_point": MushrElevationPlayEnvCfg
+    }
+)
+
+gym.register(
+    id="IsaacLab-OriginOne",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": OriginOneNavRLEnvCfg,
+        "rsl_rl_cfg_entry_point": f"{originone_agents.__name__}.rsl_rl_ppo_cfg:OriginOnePPORunnerCfg",
+        "play_env_cfg_entry_point": OriginOneNavPlayEnvCfg,
     }
 )
