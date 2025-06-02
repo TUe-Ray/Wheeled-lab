@@ -20,7 +20,7 @@ from isaaclab.managers import (
     SceneEntityCfg,
 )
 
-from wheeledlab.envs.mdp import increase_reward_weight_over_time
+from wheeledlab.envs.mdp import increase_reward_weight_over_time, anneal_min_dist_and_weight
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
@@ -32,9 +32,9 @@ import math
 ###### COMMON CONSTANTS ######
 ##############################
 
-W_MAX = 6.0    # max |yaw rate| (rad/s)
+W_MAX = 2.0    # max |yaw rate| (rad/s)
 V_MAX = 3.0    # max linear speed (m/s)
-D_MAX = (10**2 + 10**2)**0.5  # ≈7.07 m
+D_MAX = (10**2 + 10**2)**0.5  
 prev_dist = None
 
 def reset_progress_tracker(env, env_ids):
@@ -426,90 +426,101 @@ def distance_bonus(env, goal=torch.tensor([4.0,4.0])):
     return norm**2
 
 
-def goal_reached_reward(env, goal=torch.tensor([4.0,4.0]), threshold=0.3):
-    pos  = mdp.root_pos_w(env)[..., :2]
-    dist = torch.norm(goal.to(env.device) - pos, dim=-1)
-    out  = torch.where(dist < threshold, 1.0, 0.0)
-    return out
-def velocity_toward_obstacle_penalty(
-    env,
-    min_dist: float = 0.5,
-    exponent: float = 2.0,
-) -> torch.Tensor:
+def goal_reached_reward(env, goal=torch.tensor([4.0, 4.0]), threshold: float = 0.3):
     """
-    Penalty ∝ (min_dist − d_min)/min_dist  times  (speed_toward / V_MAX),
-    raised to `exponent`, and negated.  In other words:
-       d_factor    = max((min_dist − d_min)/min_dist, 0)
-       norm_speed  = max(speed_toward, 0) / V_MAX
-       penalty     = – (d_factor * norm_speed) ** exponent
+    At the step when the agent’s position comes within `threshold` of `goal`,
+    pay out a one‐time bonus equal to (episode_length_s − elapsed_time). Otherwise 0.
 
-    - If d_min ≥ min_dist  →  d_factor = 0  →  penalty = 0.
-    - Otherwise you pay a larger negative penalty the closer “d_min” is and/or the faster
-      you drive into it.
+    Args:
+        env:            ManagerBasedEnv instance.
+        goal:           2D goal point.
+        threshold:      Distance threshold for “goal reached.”
 
-    Returns a tensor of shape (B,), negative or zero.
+    Returns:
+        Tensor of shape (B,) containing 0 everywhere except at the moment of first goal‐reach,
+        where it returns “seconds left in episode.”
     """
-    # 1) Grab LiDAR hits in world‐space (B, R, 3)
+
+    # 1) Compute current XY‐distance to goal for each env
+    pos = mdp.root_pos_w(env)[..., :2]                          # (B, 2)
+    goal_t = goal.to(env.device).unsqueeze(0)                    # (1, 2)
+    dist = torch.norm(goal_t - pos, dim=-1)                      # (B,)
+
+    # 2) Mask of “just reached” (distance < threshold)
+    reached = dist < threshold                                   # (B,), dtype=bool
+
+    # 3) Figure out how much time has elapsed so far in each environment
+    dt      = env.cfg.sim.dt * env.cfg.decimation                 # seconds per step
+    elapsed = env.progress_buf.float() * dt                       # (B,), elapsed seconds
+
+    # 4) Compute “seconds left” in the episode
+    leftover = (env.episode_length_s - elapsed).clamp(min=0.0)     # (B,)
+
+    # 5) Zero‐initialize bonus, then fill in only at the moment of goal‐reach
+    bonus = torch.zeros_like(leftover, device=env.device)         # (B,)
+    bonus[reached] = leftover[reached]
+
+    return bonus
+
+def combined_lidar_velocity_penalty(    env,    min_dist: float = 0.5,    exponent: float = 2.0 , distance_weight: float = 1):
+    """
+    Single‐pass LiDAR penalty that penalizes “closeness” and “driving toward”
+    under a single exponent.  Returns a (B,) tensor of <= 0.
+
+    Steps:
+      1) Read ray_hits_w from the LIDAR: shape (B, R, 3).
+      2) Compute d_min = closest‐beam‐distance in XY.
+      3) Build d_factor = clamp((min_dist - d_min)/min_dist, 0, 1).  → distance term.
+      4) Find the (x,y) of the closest hit; compute robot→hit direction.
+      5) Project base_lin_vel onto that direction → speed_toward, clamp≥0, normalize by V_MAX.
+      6) Multiply d_factor × (norm_speed_toward) → combined_factor, and raise to “exponent”.
+      7) Return – combined_factor**exponent (so that when d_min ≥ min_dist OR speed_toward ≤ 0, penalty=0).
+
+    Over time, you could reduce the “weight” on the distance factor (e.g. anneal min_dist) so the agent
+    shifts focus to simply not ramming at high speed.
+    """
+    # 1) grab all hits:
     lidar   = env.scene.sensors["ray_caster"]
-    hits_w  = lidar.data.ray_hits_w        # (B, R, 3)
+    hits_w  = lidar.data.ray_hits_w         # shape (B, R, 3)
 
-    # 2) Robot’s base XY position in world (B, 2)
-    pos_world = mdp.root_pos_w(env)[..., :2] + env.scene.env_origins[:, :2]  # (B, 2)
-    pos_world = pos_world.unsqueeze(1)  # (B, 1, 2)
+    # 2) robot’s XY in world coordinates:
+    pos_xy = mdp.root_pos_w(env)[..., :2]    # (B, 2)
+    # if your scene uses env_origins to separate each arena, add them:
+    pos_world = pos_xy + env.scene.env_origins[:, :2]  # (B, 2)
+    pos_world = pos_world.unsqueeze(1)      # (B, 1, 2) for broadcasting
 
-    # 3) Compute horizontal distance from robot to every beam (B, R)
+    # 3) compute horizontal distances from robot to every beam:
     dist_all = torch.norm(hits_w[..., :2] - pos_world, dim=-1)  # (B, R)
-    d_min, idx_min = dist_all.min(dim=-1)                        # both shape (B,)
+    d_min, idx_min = dist_all.min(dim=-1)                       # both are (B,)
 
-    # 4) Build a “distance factor” only where d_min < min_dist
-    #    d_factor = (min_dist − d_min)/min_dist, clamped to [0, 1]
-    zero = torch.zeros_like(d_min)
-    d_factor = ((min_dist - d_min) / min_dist).clamp(min=0.0, max=1.0)  # (B,)
+    # 4) distance factor: (min_dist − d_min)/min_dist, clamped to [0,1]:
+    d_factor = ((min_dist - d_min) / min_dist).clamp(min=0.0, max=1.0) * distance_weight # (B,)
 
-    # 5) Find the XY of the closest hit (only used to compute direction, but distance factor is already from d_min)
+    # 5) locate the XY of the closest hit (for direction)
     batch_size = hits_w.shape[0]
     beam_indices = idx_min.view(batch_size, 1, 1).expand(batch_size, 1, 2)
     closest_hit_xy = torch.gather(hits_w[..., :2], dim=1, index=beam_indices).squeeze(1)  # (B, 2)
 
-    # 6) Compute unit‐vector from robot→closest hit (only needed for speed‐toward‐obstacle)
-    vec_to_obs = closest_hit_xy - pos_world.squeeze(1)       # (B, 2)
-    unit_to_obs = torch.zeros_like(vec_to_obs)                # (B, 2)
-    mask_close = (d_min < min_dist) & torch.isfinite(d_min)   # (B,)
+    # 6) build unit‐vector from robot→closest hit, but only where d_min < min_dist:
+    vec_to_obs = closest_hit_xy - pos_world.squeeze(1)   # (B, 2)
+    unit_to_obs = torch.zeros_like(vec_to_obs)            # (B, 2)
+    mask_close = (d_min < min_dist) & torch.isfinite(d_min)  # (B,)
     unit_to_obs[mask_close] = torch.nn.functional.normalize(
         vec_to_obs[mask_close], dim=-1
     )
 
-    # 7) Project robot’s world‐frame XY velocity onto that direction
-    vel_world = mdp.base_lin_vel(env)[..., :2]    # (B, 2)
-    speed_toward = (vel_world * unit_to_obs).sum(dim=-1)  # (B,)
-    speed_toward = speed_toward.clamp(min=0.0)            # only penalize if >0
-    norm_speed = (speed_toward / V_MAX).clamp(max=1.0)  # (B,)
+    # 7) project robot’s XY velocity onto that direction:
+    vel_xy = mdp.base_lin_vel(env)[..., :2]  # (B, 2)
+    speed_toward = (vel_xy * unit_to_obs).sum(dim=-1)  # (B,)
+    speed_toward = speed_toward.clamp(min=0.0)         # no penalty for “driving away”
+    norm_speed = (speed_toward / V_MAX).clamp(max=1.0) * 1 - distance_weight# (B,)
 
-    # 9) Combine distance factor × normalized speed, raise to exponent
-    combined = d_factor * norm_speed                    # (B,)
-    penalty = - (combined.pow(exponent))                # (B,)
+    # 8) combined factor = d_factor * norm_speed, → zero if d_min ≥ min_dist or speed_toward ≤ 0
+    combined = d_factor * norm_speed  # (B,)
 
+    # 9) raise to exponent and negate:
+    penalty = - combined.pow(exponent)  # (B,) ≤ 0
     return penalty
-
-def lidar_obstacle_penalty(env, min_dist: float = 0.3, exponent: float = 2.0):
-    """
-    Penalty based on the *closest* LiDAR hit in each environment.
-    - If the closest hit is ≥ min_dist → 0 penalty.
-    - If it’s < min_dist       → ((min_dist − d_min)/min_dist)**exponent.
-    Returns a tensor of shape (B,) in [0,1].
-    """
-
-    lidar  = env.scene.sensors["ray_caster"]
-    hits_w = lidar.data.ray_hits_w            
-
-    positions = mdp.root_pos_w(env)[..., :2]    
-    positions = positions.unsqueeze(1)             
-    dist = torch.norm(hits_w[..., :2] - positions, dim=-1) 
-
-    d_min = dist.min(dim=-1).values                  
-    delta = (min_dist - d_min).clamp(min=0)                
-    penalty = (delta / min_dist).pow(exponent)            
-    return -penalty
 
 
 @configclass
@@ -522,21 +533,16 @@ class TraverseABCfg:
 
     dist_bonus = RewTerm(
         func=distance_bonus ,
-        weight=5,
+        weight=20,
     )
 
     alive = RewTerm(func=mdp.rewards.is_alive, weight=0.1)
     reach = RewTerm(func=goal_reached_reward, weight=1000.0)
     
-    obstacle_penalty = RewTerm(
-        func=lidar_obstacle_penalty,
-        weight=250.0,         
-        params={"min_dist": 0.75, "exponent": 2.0},
-    )
-    velocity_toward_obstacle_penalty =    RewTerm(
-        func= velocity_toward_obstacle_penalty,
-        weight= 100.0,         
-        params={"min_dist": 1.25, "exponent": 2.0},
+    obstacle_velocity_penalty = RewTerm(
+        func=combined_lidar_velocity_penalty,
+        weight=50.0,
+        params={"min_dist": 1.25, "exponent": 2.0, "distance_weight": 0.1},
     )
 
     forward_bonus = RewTerm(
@@ -557,33 +563,25 @@ class DriftCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "dist_bonus",
-            "increase": 5,
+            "increase": -5,
             "episodes_per_increase": 20,
             "max_increases": 3,
         },
     )
 
 
-    obstacle_penalty = CurrTerm(
-        func=increase_reward_weight_over_time,
+    anneal_obstacle = CurrTerm(
+        func=anneal_min_dist_and_weight,
         params={
-            "reward_term_name": "obstacle_penalty",
-            "increase": -54,
-            "episodes_per_increase": 25,
-            "max_increases": 4,
+            "term_name":     "obstacle_velocity_penalty",
+            "start_min_dist": 1.25,
+            "end_min_dist":   0.75,
+            "start_weight":   1,
+            "end_weight":     0.1,
+            "episodes_per_step": 10,
+            "max_steps":     100,
         },
     )
-
-    velocity_toward_obstacle_penalty = CurrTerm(
-        func= increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "velocity_toward_obstacle_penalty",
-            "increase": 10,
-            "episodes_per_increase": 25,
-            "max_increases": 8,
-        },
-    )
-
 
 ##########################
 ###### TERMINATION #######
@@ -649,7 +647,7 @@ class MushrDriftRLEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 0.005  # 200 Hz
         self.decimation = 10  # 50 Hz
         self.sim.render_interval = 20 # 10 Hz
-        self.episode_length_s = 20
+        self.episode_length_s = 15
         self.actions.throttle.scale = (V_MAX, W_MAX)
 
         self.observations.policy.enable_corruption = True
