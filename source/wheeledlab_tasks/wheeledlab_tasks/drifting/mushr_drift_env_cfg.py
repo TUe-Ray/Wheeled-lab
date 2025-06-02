@@ -155,7 +155,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
         ),
     )
     obstacle1 = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle1",
+        prim_path="{ENV_REGEX_NS}/obstacle1",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0,2.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
             size=(1.0,1.0,1.5),
@@ -165,7 +165,7 @@ class MushrDriftSceneCfg(InteractiveSceneCfg):
     )
 
     obstacle2 = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Obstacle2",
+        prim_path="{ENV_REGEX_NS}/obstacle2",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[2.0,0.0,0.0], rot=[1,0,0,0]),
         spawn=sim_utils.MeshCuboidCfg(
             size=(0.5, 0.5,1.5),
@@ -564,7 +564,7 @@ class TraverseABCfg:
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
         weight=200,
-        params={"min_dist": 1, "exponent": 2.0, "distance_weight": 0.2},
+        params={"min_dist": 1a, "exponent": 2.0, "distance_weight": 0.2},
     )
 
     forward_bonus = RewTerm(
