@@ -1,8 +1,5 @@
 import torch
-import numpy as np
 import isaacsim.core.utils.prims as prim_utils
-from itertools import product
-import random
 import isaaclab.envs.mdp as mdp
 import isaaclab.sim as sim_utils
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -210,6 +207,7 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
         )
 
     return torch.zeros(env.num_envs, device=env.device)
+
 _step_counter: torch.Tensor | None = None
 _time_left_paid: torch.Tensor | None = None
 
@@ -453,13 +451,13 @@ class TraverseABCfg:
     
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
-        weight=200,
-        params={"min_dist": 1, "exponent": 2.0, "distance_weight": 0.2},
+        weight=400,
+        params={"min_dist": 1, "exponent": 2.0, "distance_weight": 0.4},
     )
 
     forward_bonus = RewTerm(
         func=forward_velocity_bonus,
-        weight=1.0,   
+        weight=10,   
     )
 
 ########################
@@ -470,12 +468,21 @@ class TraverseABCfg:
 class NavigationCurriculumCfg:
 
 
-    increase_penalty = CurrTerm(
+    decrease_dist_bonus = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "dist_bonus",
             "increase": -5,
             "episodes_per_increase": 30,
+            "max_increases": 3,
+        },
+    )
+    decrease_forward_bonus = CurrTerm(
+        func=increase_reward_weight_over_time,
+        params={
+            "reward_term_name": "forward_bonus",
+            "increase": -3,
+            "episodes_per_increase": 10,
             "max_increases": 3,
         },
     )
