@@ -570,7 +570,6 @@ class TraverseABCfg:
     forward_bonus = RewTerm(
         func=forward_velocity_bonus,
         weight=1.0,   # scale this bonus as you like
-        params={"max_speed": 3.0},
     )
 
 ########################
