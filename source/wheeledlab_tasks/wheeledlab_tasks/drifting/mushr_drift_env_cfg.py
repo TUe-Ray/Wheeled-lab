@@ -245,9 +245,28 @@ def spin_in_place(env, env_ids, max_w: float = 6.0):
         )
 
     return torch.zeros(env.num_envs, device=env.device)
-  
+_step_counter: torch.Tensor | None = None
+_time_left_paid: torch.Tensor | None = None
 
-# 4) RANDOMIZE GOAL
+def reset_time_buffers(env, env_ids):
+    """
+    Called on every environment reset: zero out both our per‐env step counter
+    and the “already gave finish‐bonus” flag.
+    """
+    global _step_counter, _time_left_paid
+    N = env.num_envs
+
+    # On first call (or if num_envs changed), allocate new buffers:
+    if _step_counter is None or _step_counter.shape[0] != N:
+        _step_counter   = torch.zeros(N, device=env.device, dtype=torch.int32)
+        _time_left_paid = torch.zeros(N, device=env.device, dtype=torch.bool)
+    else:
+        # Otherwise just zero out the requested subset:
+        _step_counter[env_ids]   = 0
+        _time_left_paid[env_ids] = False
+
+    # Return a dummy tensor so IsaacLab is satisfied:
+    return torch.zeros(env.num_envs, device=env.device)
 
 @configclass
 class DriftEventsCfg:
@@ -293,6 +312,10 @@ class DriftEventsCfg:
 
     reset_dist_progress = EventTerm(
         func=reset_dist_tracker,
+        mode="reset",
+    )
+    reset_time_buffers = EventTerm(
+        func=reset_time_buffers,
         mode="reset",
     )
 
@@ -428,39 +451,39 @@ def distance_bonus(env, goal=torch.tensor([4.0,4.0])):
 
 def goal_reached_reward(env, goal=torch.tensor([4.0, 4.0]), threshold: float = 0.3):
     """
-    At the step when the agent’s position comes within `threshold` of `goal`,
-    pay out a one‐time bonus equal to (episode_length_s − elapsed_time). Otherwise 0.
+    1) Every time compute(...) is called, we increment a per‐env step counter.
+    2) If distance < threshold and we haven't paid the time‐left bonus yet, then:
+         pay = 1.0  +  (max_episode_length_s − elapsed_seconds),
+         and mark “already paid” so we don't do it again.
+    3) Otherwise return 0.
 
-    Args:
-        env:            ManagerBasedEnv instance.
-        goal:           2D goal point.
-        threshold:      Distance threshold for “goal reached.”
-
-    Returns:
-        Tensor of shape (B,) containing 0 everywhere except at the moment of first goal‐reach,
-        where it returns “seconds left in episode.”
+    Returns a (B,) tensor of ≤ 0 (zero) if not yet reached, or
+    (1.0 + time_left) the exact step we first cross below threshold.
     """
 
-    # 1) Compute current XY‐distance to goal for each env
-    pos = mdp.root_pos_w(env)[..., :2]                          # (B, 2)
-    goal_t = goal.to(env.device).unsqueeze(0)                    # (1, 2)
-    dist = torch.norm(goal_t - pos, dim=-1)                      # (B,)
+    global _step_counter, _time_left_paid
+    dt_per_step = env.cfg.sim.dt * env.cfg.decimation
+    _step_counter += 1  
 
-    # 2) Mask of “just reached” (distance < threshold)
-    reached = dist < threshold                                   # (B,), dtype=bool
+    elapsed_seconds = _step_counter.float() * dt_per_step  
 
-    # 3) Figure out how much time has elapsed so far in each environment
-    dt      = env.cfg.sim.dt * env.cfg.decimation                 # seconds per step
-    elapsed = env.progress_buf.float() * dt                       # (B,), elapsed seconds
+    pos = mdp.root_pos_w(env)[..., :2]                              
+    goal_tensor = torch.tensor(goal, device=env.device).unsqueeze(0) 
+    dist = torch.norm(goal_tensor - pos, dim=-1)                     
 
-    # 4) Compute “seconds left” in the episode
-    leftover = (env.episode_length_s - elapsed).clamp(min=0.0)     # (B,)
+    has_reached = dist < threshold              # which envs are within threshold
+    not_paid   = ~_time_left_paid               # which envs have not yet received bonus
+    just_reached = has_reached & not_paid       # first‐time crossing
 
-    # 5) Zero‐initialize bonus, then fill in only at the moment of goal‐reach
-    bonus = torch.zeros_like(leftover, device=env.device)         # (B,)
-    bonus[reached] = leftover[reached]
+    out = torch.zeros(env.num_envs, device=env.device)  # default zeros
 
-    return bonus
+    if just_reached.any():
+        out[just_reached] = 1.0
+        time_left = (env.episode_length_s - elapsed_seconds).clamp(min=0.0)  
+        out[just_reached] += time_left[just_reached]
+        _time_left_paid[just_reached] = True
+
+    return out
 
 def combined_lidar_velocity_penalty(    env,    min_dist: float = 0.5,    exponent: float = 2.0 , distance_weight: float = 1):
     """
