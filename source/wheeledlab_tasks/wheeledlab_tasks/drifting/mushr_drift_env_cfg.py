@@ -20,7 +20,7 @@ from isaaclab.managers import (
     SceneEntityCfg,
 )
 
-from wheeledlab.envs.mdp import increase_reward_weight_over_time, anneal_min_dist_and_weight
+from wheeledlab.envs.mdp import increase_reward_weight_over_time
 from wheeledlab_assets import MUSHR_SUS_2WD_CFG
 from wheeledlab_tasks.common import BlindObsCfg, MushrRWDActionCfg, SkidSteerActionCfg, OriginActionCfg
 from wheeledlab_assets import OriginRobotCfg
@@ -541,7 +541,7 @@ class TraverseABCfg:
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
         weight=50.0,
-        params={"min_dist": 1.25, "exponent": 2.0, "distance_weight": 0.1},
+        params={"min_dist": 1.25, "exponent": 2.0, "distance_weight": 0.2},
     )
 
     forward_bonus = RewTerm(
@@ -568,19 +568,6 @@ class DriftCurriculumCfg:
         },
     )
 
-
-    anneal_obstacle = CurrTerm(
-        func=anneal_min_dist_and_weight,
-        params={
-            "term_name":     "obstacle_velocity_penalty",
-            "start_min_dist": 1.25,
-            "end_min_dist":   0.75,
-            "start_weight":   1,
-            "end_weight":     0.1,
-            "episodes_per_step": 10,
-            "max_steps":     100,
-        },
-    )
 
 ##########################
 ###### TERMINATION #######
