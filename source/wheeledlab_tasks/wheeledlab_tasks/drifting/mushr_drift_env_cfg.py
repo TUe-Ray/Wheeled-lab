@@ -364,7 +364,7 @@ class DriftEventsRandomCfg(DriftEventsCfg):
 
 _turn_buffers = None
 
-def forward_velocity_bonus(env, max_speed: float = 3.0) -> torch.Tensor:
+def forward_velocity_bonus(env) -> torch.Tensor:
     """
     A small reward ∈ [0,1] proportional to how fast the car is driving forward.
     - If the car’s forward‐component of velocity ≥ max_speed, reward = 1.0.
@@ -401,7 +401,7 @@ def forward_velocity_bonus(env, max_speed: float = 3.0) -> torch.Tensor:
     forward_speed_clamped = forward_speed.clamp(min=0.0)  # (B,)
 
     # 7) Normalize so that speeds ≥ max_speed give a 1.0 bonus:
-    bonus = (forward_speed_clamped / max_speed).clamp(max=1.0)  # (B,) ∈ [0,1]
+    bonus = (forward_speed_clamped / V_MAX).clamp(max=1.0)  # (B,) ∈ [0,1]
 
     return bonus
 
@@ -536,8 +536,7 @@ class TraverseABCfg:
         weight=20,
     )
 
-    alive = RewTerm(func=mdp.rewards.is_alive, weight=0.1)
-    reach = RewTerm(func=goal_reached_reward, weight=1000.0)
+    reach = RewTerm(func=goal_reached_reward, weight=500.0)
     
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
