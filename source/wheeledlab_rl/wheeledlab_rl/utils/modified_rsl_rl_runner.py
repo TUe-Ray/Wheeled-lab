@@ -11,8 +11,7 @@ try:
     warnings.filterwarnings("ignore", category=TqdmExperimentalWarning)
     from tqdm.rich import tqdm
 except ImportError:
-    # Rich not installed, we only throw an error
-    # if the progress bar is used
+
     tqdm = None
 
 import time
