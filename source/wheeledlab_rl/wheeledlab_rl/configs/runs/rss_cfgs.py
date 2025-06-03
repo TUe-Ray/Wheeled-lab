@@ -17,12 +17,12 @@ class RSS_NAV_CONFIG(RslRlRunConfig):
         log=LogConfig(
             no_log     = False,        
             no_wandb   = False,          
-            log_every  = 5,           
+            log_every  = 1,           
             video          = True,
             video_length   = 300,       
             video_interval = 3000,       
             no_checkpoints   = False,
-            checkpoint_every = 20,   
+            checkpoint_every = 2,   
         ),
     )
     agent_setup = AgentSetup(

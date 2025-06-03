@@ -47,9 +47,7 @@ class NavigationTerrainImporterCfg(TerrainImporterCfg):
         dynamic_friction=1.0,
     )
     debug_vis=False
-    visual_material = PreviewSurfaceCfg(
-        diffuse_color=(1.0, 1.0, 1.0)   # RGB = white
-    )
+
 @configclass
 class OriginOneNavigationSceneCfg(InteractiveSceneCfg):
     """Configuration for a OriginOne car Scene with racetrack terrain with no sensors"""
@@ -461,7 +459,7 @@ class NavigationCurriculumCfg:
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "dist_bonus",
-            "increase": -5,
+            "increase": -4,
             "episodes_per_increase": 15,
             "max_increases": 3,
         },
