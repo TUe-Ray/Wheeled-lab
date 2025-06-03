@@ -25,7 +25,7 @@ from wheeledlab_assets import OriginRobotCfg
 ###### COMMON CONSTANTS ######
 ##############################
 
-W_MAX = 2.0    # max |yaw rate| (rad/s)
+W_MAX = 1.0    # max |yaw rate| (rad/s)
 V_MAX = 3.0    # max linear speed (m/s)
 D_MAX = (10**2 + 10**2)**0.5  
 
@@ -45,6 +45,7 @@ class NavigationTerrainImporterCfg(TerrainImporterCfg):
         restitution_combine_mode="multiply",
         static_friction=1.1,
         dynamic_friction=1.0,
+        friction_combine_mode = "max",
     )
     debug_vis=False
 
@@ -182,31 +183,31 @@ def reset_spin_timer(env, env_ids, duration: float = 1.0):
     _spin_timers = torch.full((N,), duration, device=env.device)
     return torch.zeros(N, device=env.device)
 
-def spin_in_place(env, env_ids, max_w: float = 6.0):
-    """
-    Interval term: while each env’s timer > 0, command a random yaw velocity.
-    """
-    global _spin_timers
-    dt = env.cfg.sim.dt * env.cfg.decimation 
-    active = []
-    for i in env_ids.tolist():
-        if _spin_timers[i] > 0.0:
-            _spin_timers[i] -= dt
-            active.append(int(i))
+# def spin_in_place(env, env_ids, max_w: float = 6.0):
+#     """
+#     Interval term: while each env’s timer > 0, command a random yaw velocity.
+#     """
+#     global _spin_timers
+#     dt = env.cfg.sim.dt * env.cfg.decimation 
+#     active = []
+#     for i in env_ids.tolist():
+#         if _spin_timers[i] > 0.0:
+#             _spin_timers[i] -= dt
+#             active.append(int(i))
 
-    if active:
-        active_ids = torch.tensor(active, device=env.device, dtype=torch.int64)
-        mdp.push_by_setting_velocity(
-            env,
-            env_ids=active_ids,
-            velocity_range={
-                "x": (0.0, 0.0),
-                "y": (0.0, 0.0),
-                "yaw": (-max_w, max_w),
-            },
-        )
+#     if active:
+#         active_ids = torch.tensor(active, device=env.device, dtype=torch.int64)
+#         mdp.push_by_setting_velocity(
+#             env,
+#             env_ids=active_ids,
+#             velocity_range={
+#                 "x": (0.0, 0.0),
+#                 "y": (0.0, 0.0),
+#                 "yaw": (-max_w, max_w),
+#             },
+#         )
 
-    return torch.zeros(env.num_envs, device=env.device)
+#     return torch.zeros(env.num_envs, device=env.device)
 
 _step_counter: torch.Tensor | None = None
 _time_left_paid: torch.Tensor | None = None
@@ -231,12 +232,6 @@ def reset_time_buffers(env, env_ids):
 @configclass
 class NavigationEventsCfg:
 
-    reset_spin_timer = EventTerm(
-        func=reset_spin_timer,
-        mode="reset",
-        params={"duration": 0.25},
-    )
-
     reset_robot = EventTerm(
         func=mdp.reset_root_state_uniform,
         mode="reset",
@@ -252,17 +247,10 @@ class NavigationEventsCfg:
                 "z":    (0.0, 0.0),
                 "roll": (0.0, 0.0),
                 "pitch":(0.0, 0.0),
-                "yaw":   (0.0, 0.0),
+                "yaw":   (-2, 2),
             },
             "asset_cfg": SceneEntityCfg("robot"),
         },
-    )
-
-    spin_in_place = EventTerm(
-        func=spin_in_place,
-        mode="interval",
-        interval_range_s=(0.005 * 10, 0.005 * 10),  
-        params={"max_w": 6.0},
     )
 
     reset_step_progress = EventTerm(
@@ -283,8 +271,8 @@ class NavigationEventsRandomCfg(NavigationEventsCfg):
         func=mdp.randomize_rigid_body_material,
         mode="startup",
         params={
-            "static_friction_range": (0.4, 0.7),
-            "dynamic_friction_range": (0.2, 0.6),
+            "static_friction_range": (0.5, 1),
+            "dynamic_friction_range": (0.5, 1),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 20,
             "asset_cfg": SceneEntityCfg("robot", body_names=".*wheel"), 

@@ -58,46 +58,24 @@ def lidar_distances(env, sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster
 
     return torch.cat([front, left, right, rear], dim=-1)  # (B, 12)
 
-ODOM_POSE = None
 
-def update_odometry_pose(env, dt, wheel_base=0.4):
-    global ODOM_POSE
+def to_goal_vector(env, goal: torch.Tensor = GOAL) -> torch.Tensor:
+    pos_xy = mdp.root_pos_w(env)[..., :2]         
 
-    wheel_speeds = wheel_encoder(env) 
-    v_left = wheel_speeds[:, 0]
-    v_right = wheel_speeds[:, 1]
+    quat   = mdp.root_quat_w(env)    
+    qw, qx, qy, qz = quat.unbind(-1)
+    yaw = torch.atan2(
+        2.0 * (qw * qz + qx * qy),
+        1.0 - 2.0 * (qy * qy + qz * qz),
+    )                                               
 
-    if ODOM_POSE is None:
-        pos = mdp.root_pos_w(env)[..., :2]       
-        yaw = root_euler_xyz(env)[..., 2]       
-        ODOM_POSE = torch.cat([pos, yaw.unsqueeze(-1)], dim=-1)
-
-
-    v = (v_left + v_right) / 2.0
-    w = (v_right - v_left) / wheel_base
-    delta_theta = w * dt
-    delta_x = v * torch.cos(ODOM_POSE[:, 2] + delta_theta / 2) * dt
-    delta_y = v * torch.sin(ODOM_POSE[:, 2] + delta_theta / 2) * dt
-
-    ODOM_POSE[:, 0] += delta_x
-    ODOM_POSE[:, 1] += delta_y
-    ODOM_POSE[:, 2] += delta_theta
-
-    return ODOM_POSE
-
-def to_goal_vector(env, goal=GOAL):
-    pose = update_odometry_pose(env, env.cfg.sim.dt * env.cfg.decimation)
-    goal = goal.to(env.device)
-
-    delta = goal - pose[:, :2]
-    cos_yaw = torch.cos(pose[:, 2])
-    sin_yaw = torch.sin(pose[:, 2])
-
+    delta = goal.to(env.device) - pos_xy          
+    cos_yaw = torch.cos(yaw)
+    sin_yaw = torch.sin(yaw)
     x_rel =  cos_yaw * delta[:, 0] + sin_yaw * delta[:, 1]
     y_rel = -sin_yaw * delta[:, 0] + cos_yaw * delta[:, 1]
 
-    return torch.stack([x_rel, y_rel], dim=-1)
-
+    return torch.stack((x_rel, y_rel), dim=-1)      
 @configclass
 class ObsCfg:
     """Default observation configuration"""
