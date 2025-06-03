@@ -7,7 +7,7 @@ from wheeledlab_rl.configs import (
 @configclass
 class RSS_NAV_CONFIG(RslRlRunConfig):
     env_setup = EnvSetup(
-        num_envs=256,
+        num_envs=2,
         task_name="IsaacLab-OriginOneNavigation"
     )
     train = RLTrainConfig(
@@ -15,8 +15,14 @@ class RSS_NAV_CONFIG(RslRlRunConfig):
         rl_algo_lib="rsl",
         rl_algo_class="ppo",
         log=LogConfig(
-            video_interval=30000,
-            video_length = 300,
+            no_log     = False,        
+            no_wandb   = False,          
+            log_every  = 5,           
+            video          = True,
+            video_length   = 300,       
+            video_interval = 3000,       
+            no_checkpoints   = False,
+            checkpoint_every = 20,   
         ),
     )
     agent_setup = AgentSetup(
