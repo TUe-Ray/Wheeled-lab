@@ -32,11 +32,6 @@ OriginRobotCfg = ArticulationCfg(
             contact_offset=0.01, rest_offset=0.0
         ),
     ),
-    rigid_props= sim_utils.RigidBodyPropertiesCfg(
-        angular_damping       = ANG_DAMPING,
-        max_angular_velocity  = MAX_ANG_VEL,
-    ),
-
     actuators={
         "wheel_act": IdealPDActuatorCfg(
             joint_names_expr = [".*_wheel_joint"],
