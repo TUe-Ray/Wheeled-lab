@@ -30,12 +30,12 @@ class OnPolicyRunner(runners.OnPolicyRunner):
         if not self.no_wandb:
             self.logger_type = "wandb"
 
-
-        self.log_every = getattr(log_cfg, "log_every", 10)           
-        self.ckpt_every = getattr(log_cfg, "checkpoint_every", 50) 
+        # How often to log scalars and save checkpoints
+        self.log_every = getattr(log_cfg, "log_every", 10)
+        self.ckpt_every = getattr(log_cfg, "checkpoint_every", 50)
 
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
-        # initialize writer
+        # ─── initialize writer ──────────────────────────────────────────
         if not self.no_log and self.logger_type == "wandb":
             from rsl_rl.utils.wandb_utils import WandbSummaryWriter
 
@@ -46,39 +46,47 @@ class OnPolicyRunner(runners.OnPolicyRunner):
                 self.env.cfg, self.cfg, self.alg_cfg, self.policy_cfg
             )
 
+        # ─── optionally randomize starting episode length ───────────────
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(
-                self.env.episode_length_buf, high=int(self.env.max_episode_length)
+                self.env.episode_length_buf,
+                high=int(self.env.max_episode_length),
             )
+
+        # ─── get initial observations on the correct device ─────────────
         obs, extras = self.env.get_observations()
         critic_obs = extras["observations"].get("critic", obs)
         obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
-        self.train_mode()  
+        self.train_mode()
+
+        # ─── GPU‐side episode‐stat buffers ──────────────────────────────
         ep_return = torch.zeros(self.env.num_envs, device=self.device)
         ep_len = torch.zeros(self.env.num_envs, device=self.device)
 
+        # ─── host‐side buffers for finished episodes ────────────────────
         rewbuffer = deque(maxlen=100)
         lenbuffer = deque(maxlen=100)
 
         start_iter = self.current_learning_iteration
         tot_iter = start_iter + num_learning_iterations
 
-
         use_bar = (tqdm is not None) and not (self.logger_type == "wandb")
         for it in tqdm(range(start_iter, tot_iter), disable=not use_bar):
-            start = time.time()
+            # Optional sanity checks:
             if obs.isnan().any():
                 raise ValueError("NaN in the initial observation (obs)")
             if critic_obs.isnan().any():
                 raise ValueError("NaN in the initial observation (critic_obs)")
 
+            # ─── ROLLOUT PHASE (no gradients) ─────────────────────────
             with torch.inference_mode():
-                for i in range(self.num_steps_per_env):
+                for _ in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)
                     obs, rewards, dones, infos = self.env.step(actions)
                     if actions.isnan().any():
                         raise ValueError("NaN in actions")
 
+                    # normalize observations
                     obs = self.obs_normalizer(obs)
                     if "critic" in infos["observations"]:
                         critic_obs = self.critic_obs_normalizer(
@@ -87,6 +95,7 @@ class OnPolicyRunner(runners.OnPolicyRunner):
                     else:
                         critic_obs = obs
 
+                    # accumulate episode‐returns & lengths on GPU
                     ep_return += rewards.squeeze(-1)
                     ep_len += 1
                     done_mask = dones.squeeze(-1)
@@ -95,43 +104,46 @@ class OnPolicyRunner(runners.OnPolicyRunner):
                         finished_rew = ep_return[done_mask]
                         finished_len = ep_len[done_mask]
 
+                        # reset these env counters
                         ep_return[done_mask] = 0.0
                         ep_len[done_mask] = 0
 
+                        # one batched GPU→CPU copy per iteration
                         rewbuffer.extend(finished_rew.cpu().tolist())
                         lenbuffer.extend(finished_len.cpu().tolist())
 
+                    # let PPO process each step
                     self.alg.process_env_step(rewards, dones, infos)
+            # ─── END of `with inference_mode()` ──────────────────────────
 
+            # ─── LEARNING PHASE (outside inference_mode, so gradients work) ─
             self.alg.compute_returns(critic_obs)
             loss_dict = self.alg.update()
-            stop = time.time()
-            learn_time = stop - start
 
             self.current_learning_iteration = it
 
-            if not self.no_log and not self.no_wandb and (it % self.log_every == 0):
+            # ─── LOG SCALARS every self.log_every iterations ─────────────
+            if (not self.no_log and not self.no_wandb) and (it % self.log_every == 0):
                 scalar_dict = {
                     "iter": it,
                     "reward_mean": float(np.mean(rewbuffer)) if rewbuffer else 0.0,
-                    "len_mean":    float(np.mean(lenbuffer)) if lenbuffer else 0.0,
+                    "len_mean": float(np.mean(lenbuffer)) if lenbuffer else 0.0,
                     **{f"loss/{k}": v for k, v in loss_dict.items()},
                 }
-
                 self.writer.log_scalars(scalar_dict)
                 rewbuffer.clear()
                 lenbuffer.clear()
 
-            if (it % self.ckpt_every == 0) and (self.ckpt_every > 0):
+            # ─── SAVE CHECKPOINT every self.ckpt_every iterations ─────────
+            if (self.ckpt_every > 0) and (it % self.ckpt_every == 0):
                 model_path = os.path.join(self.log_dir, "models", f"model_{it}.pt")
                 os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                # Use a background thread so `torch.save` cannot block main loop
                 threading.Thread(
                     target=torch.save,
                     args=(self.alg.policy.actor, model_path),
-                    daemon=True
+                    daemon=True,
                 ).start()
-
-
 
 
 # import warnings
