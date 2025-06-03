@@ -1,4 +1,4 @@
-from isaaclab.assets import ArticulationCfg, RigidBodyPropertiesCfg
+from isaaclab.assets import ArticulationCfg
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg
 
@@ -16,10 +16,6 @@ wheel_material = sim_utils.RigidBodyMaterialCfg(
     friction_combine_mode = "max",   # “stickiest wins”
 )
 
-# --- 1.  Global ground material (somewhere in your scene cfg) -----------
-# NavigationTerrainImporterCfg.physics_material = wheel_material
-
-# --- 2.  Robot definition -----------------------------------------------
 OriginRobotCfg = ArticulationCfg(
     prim_path="{ENV_REGEX_NS}/Robot",
     spawn=sim_utils.UrdfFileCfg(
@@ -36,7 +32,7 @@ OriginRobotCfg = ArticulationCfg(
             contact_offset=0.01, rest_offset=0.0
         ),
     ),
-    rigid_props=RigidBodyPropertiesCfg(
+    rigid_props= sim_utils.RigidBodyPropertiesCfg(
         angular_damping       = ANG_DAMPING,
         max_angular_velocity  = MAX_ANG_VEL,
     ),
