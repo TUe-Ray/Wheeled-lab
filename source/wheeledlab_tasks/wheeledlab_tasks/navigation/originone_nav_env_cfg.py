@@ -28,7 +28,8 @@ from wheeledlab_assets import OriginRobotCfg
 W_MAX = 1.0    # max |yaw rate| (rad/s)
 V_MAX = 3.0    # max linear speed (m/s)
 D_MAX = (10**2 + 10**2)**0.5  
-GOAL = torch.tensor([4.0, 4.0])
+GOAL = torch.tensor([4.0, 4.0])         # lives on CPU
+_GOAL_ON_DEVICE = None                  # will hold the single GPU copy once
 ###################
 ###### SCENE ######
 ###################
@@ -334,8 +335,11 @@ def forward_velocity_bonus(env) -> torch.Tensor:
 def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
     pos = mdp.root_pos_w(env)[..., :2]
     vel = mdp.base_lin_vel(env)[..., :2]
-
-    to_goal      = goal.to(env.device) - pos
+    global _GOAL_ON_DEVICE
+    device = env.device
+    if _GOAL_ON_DEVICE is None or _GOAL_ON_DEVICE.device != device:
+        _GOAL_ON_DEVICE = GOAL.to(device)  
+    to_goal      = _GOAL_ON_DEVICE - pos
     to_goal_norm = torch.nn.functional.normalize(to_goal, dim=-1)
     speed    = torch.norm(vel, dim=-1).clamp(max=V_MAX)
     vel_norm = torch.nn.functional.normalize(vel + 1e-6, dim=-1)
@@ -347,20 +351,27 @@ def signed_velocity_toward_goal(env, goal=torch.tensor([4.0,4.0])):
 
 def distance_bonus(env, goal=torch.tensor([4.0,4.0])):
     pos  = mdp.root_pos_w(env)[...,:2]
-    dist = torch.norm(goal.to(env.device)-pos, dim=-1).clamp(max=D_MAX)
+    global _GOAL_ON_DEVICE
+    device = env.device
+    if _GOAL_ON_DEVICE is None or _GOAL_ON_DEVICE.device != device:
+        _GOAL_ON_DEVICE = GOAL.to(device)  
+    dist = torch.norm(_GOAL_ON_DEVICE -pos, dim=-1).clamp(max=D_MAX)
     norm = (1.0 - dist/D_MAX).clamp(0.0, 1.0)
     return norm**2
 
 
 def goal_reached_reward(env, goal=torch.tensor([4.0, 4.0]), threshold: float = 0.3):
-    global _step_counter, _time_left_paid
+    global _step_counter, _time_left_paid, _GOAL_ON_DEVICE
+    device = env.device
+    if _GOAL_ON_DEVICE is None or _GOAL_ON_DEVICE.device != device:
+        _GOAL_ON_DEVICE = GOAL.to(device)  
     dt_per_step = env.cfg.sim.dt * env.cfg.decimation
     _step_counter += 1  
 
     elapsed_seconds = _step_counter.float() * dt_per_step  
 
     pos = mdp.root_pos_w(env)[..., :2]                              
-    goal_tensor = torch.tensor(goal, device=env.device).unsqueeze(0) 
+    goal_tensor = _GOAL_ON_DEVICE.unsqueeze(0) 
     dist = torch.norm(goal_tensor - pos, dim=-1)                     
 
     has_reached = dist < threshold             
@@ -469,7 +480,11 @@ class NavigationCurriculumCfg:
 
 def reached_goal(env, goal=[4.0, 4.0], thresh: float = 0.3):
     pos   = mdp.root_pos_w(env)[..., :2]          
-    goal  = torch.tensor(goal, device=env.device).unsqueeze(0)  
+    global _GOAL_ON_DEVICE
+    device = env.device
+    if _GOAL_ON_DEVICE is None or _GOAL_ON_DEVICE.device != device:
+        _GOAL_ON_DEVICE = GOAL.to(device)  
+    goal  = _GOAL_ON_DEVICE.unsqueeze(0)  
     dist  = torch.norm(pos - goal, dim=-1)             
     reached = dist < thresh
     return reached
@@ -504,7 +519,7 @@ class OriginOneNavigationRLEnvCfg(ManagerBasedRLEnvCfg):
     rewards: TraverseABCfg = TraverseABCfg()
     events: NavigationEventsCfg = NavigationEventsRandomCfg()
     terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
-
+    curriculum: NavigationCurriculumCfg = NavigationCurriculumCfg()
     def __post_init__(self):
                 # Scene settings
         self.scene = OriginOneNavigationSceneCfg(

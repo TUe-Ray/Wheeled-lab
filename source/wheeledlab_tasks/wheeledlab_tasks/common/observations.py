@@ -12,6 +12,7 @@ from isaaclab.utils.noise import (
 from wheeledlab.envs.mdp import root_euler_xyz
 
 GOAL = torch.tensor([4.0, 4.0])
+_GOAL_ON_DEVICE = None     
 MAX_SPEED = 3.0
 WHEEL_RADIUS = 0.12
 
@@ -68,8 +69,11 @@ def to_goal_vector(env, goal: torch.Tensor = GOAL) -> torch.Tensor:
         2.0 * (qw * qz + qx * qy),
         1.0 - 2.0 * (qy * qy + qz * qz),
     )                                               
-
-    delta = goal.to(env.device) - pos_xy          
+    global _GOAL_ON_DEVICE
+    device = env.device
+    if _GOAL_ON_DEVICE is None or _GOAL_ON_DEVICE.device != device:
+        _GOAL_ON_DEVICE = GOAL.to(device)  
+    delta = _GOAL_ON_DEVICE- pos_xy          
     cos_yaw = torch.cos(yaw)
     sin_yaw = torch.sin(yaw)
     x_rel =  cos_yaw * delta[:, 0] + sin_yaw * delta[:, 1]
