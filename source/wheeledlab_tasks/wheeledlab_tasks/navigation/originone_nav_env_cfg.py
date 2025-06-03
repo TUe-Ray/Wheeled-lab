@@ -420,7 +420,7 @@ class TraverseABCfg:
 
     dist_bonus = RewTerm(
         func=distance_bonus ,
-        weight=20,
+        weight=10,
     )
 
     reach = RewTerm(func=goal_reached_reward, weight=500.0)
@@ -433,7 +433,7 @@ class TraverseABCfg:
 
     forward_bonus = RewTerm(
         func=forward_velocity_bonus,
-        weight=10,   
+        weight=3,   
     )
 
 ########################
