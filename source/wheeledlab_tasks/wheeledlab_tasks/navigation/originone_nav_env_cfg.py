@@ -45,10 +45,11 @@ class NavigationTerrainImporterCfg(TerrainImporterCfg):
         restitution_combine_mode="multiply",
         static_friction=1.1,
         dynamic_friction=1.0,
-        friction_combine_mode = "max",
     )
     debug_vis=False
-
+    visual_material = PreviewSurfaceCfg(
+        diffuse_color=(1.0, 1.0, 1.0)   # RGB = white
+    )
 @configclass
 class OriginOneNavigationSceneCfg(InteractiveSceneCfg):
     """Configuration for a OriginOne car Scene with racetrack terrain with no sensors"""

@@ -75,7 +75,8 @@ def to_goal_vector(env, goal: torch.Tensor = GOAL) -> torch.Tensor:
     x_rel =  cos_yaw * delta[:, 0] + sin_yaw * delta[:, 1]
     y_rel = -sin_yaw * delta[:, 0] + cos_yaw * delta[:, 1]
 
-    return torch.stack((x_rel, y_rel), dim=-1)      
+    return torch.stack((x_rel, y_rel), dim=-1)  
+   
 @configclass
 class ObsCfg:
     """Default observation configuration"""
