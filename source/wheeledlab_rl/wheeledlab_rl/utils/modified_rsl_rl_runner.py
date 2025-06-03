@@ -133,19 +133,12 @@ class OnPolicyRunner(runners.OnPolicyRunner):
             stop = time.time()
             learn_time = stop - start
             self.current_learning_iteration = it
-                        # ─── LOG SCALARS every self.log_every iterations ─────────────
             if (not self.no_log and not self.no_wandb) and (it % self.log_every == 0):
-                scalar_dict = {
-                    "iter": it,
-                    "reward_mean": float(np.mean(rewbuffer)) if rewbuffer else 0.0,
-                    "len_mean": float(np.mean(lenbuffer)) if lenbuffer else 0.0,
-                    **{f"loss/{k}": v for k, v in loss_dict.items()},
-                }
-                self.writer.log_scalars(scalar_dict)
+                self.log(locals())
                 rewbuffer.clear()
                 lenbuffer.clear()
 
-            # ─── SAVE CHECKPOINT every self.ckpt_every iterations ─────────
+
             if (self.ckpt_every > 0) and (it % self.ckpt_every == 0):
                 model_path = os.path.join(self.log_dir, "models", f"model_{it}.pt")
                 os.makedirs(os.path.dirname(model_path), exist_ok=True)

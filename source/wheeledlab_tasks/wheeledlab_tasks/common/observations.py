@@ -50,13 +50,13 @@ def lidar_distances(env, sensor_cfg: SceneEntityCfg = SceneEntityCfg("ray_caster
         return pooled  
 
 
-    front = pool_region(-45, 45, 10)          # 90° front → 6 bins
-    rear = pool_region(150, 180, 3)          # rear-right
-    rear = torch.cat([rear, pool_region(-180, -150, 3)], dim=-1)  # rear-left (2 bins total)
-    left = pool_region(90, 150, 3)           # left side → 2 bins
-    right = pool_region(-150, -90, 3)        # right side → 2 bins
+    front = pool_region(-45, 45, 10)          
+    rear = pool_region(150, 180, 3)        
+    rear = torch.cat([rear, pool_region(-180, -150, 3)], dim=-1)  
+    left = pool_region(90, 150, 3)          
+    right = pool_region(-150, -90, 3)        
 
-    return torch.cat([front, left, right, rear], dim=-1)  # (B, 12)
+    return torch.cat([front, left, right, rear], dim=-1)  
 
 
 def to_goal_vector(env, goal: torch.Tensor = GOAL) -> torch.Tensor:
