@@ -1,7 +1,7 @@
 from isaaclab.assets import ArticulationCfg
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg
-
+import os 
 WHEEL_RADIUS     = 0.1175
 MAX_WHEEL_SPEED  = 2.0               # [m s⁻¹]
 FRICTION_STATIC  = 1.5               # tyres & ground
