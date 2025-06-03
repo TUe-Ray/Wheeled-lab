@@ -28,7 +28,7 @@ from wheeledlab_assets import OriginRobotCfg
 W_MAX = 1.0    # max |yaw rate| (rad/s)
 V_MAX = 3.0    # max linear speed (m/s)
 D_MAX = (10**2 + 10**2)**0.5  
-
+GOAL = torch.tensor([4.0, 4.0])
 ###################
 ###### SCENE ######
 ###################
@@ -301,17 +301,6 @@ class NavigationEventsRandomCfg(NavigationEventsCfg):
             },
         },
     )
-
-    push_robots_lf = EventTerm( 
-        func=mdp.push_by_setting_velocity,
-        mode="startup",
-        params={
-            "velocity_range":{
-                "yaw": (-2, 2)
-            },
-        },
-    )
-
     add_base_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         mode="startup",
@@ -515,7 +504,6 @@ class OriginOneNavigationRLEnvCfg(ManagerBasedRLEnvCfg):
     rewards: TraverseABCfg = TraverseABCfg()
     events: NavigationEventsCfg = NavigationEventsRandomCfg()
     terminations: GoalNavTerminationsCfg = GoalNavTerminationsCfg()
-    curriculum: NavigationCurriculumCfg = NavigationCurriculumCfg()
 
     def __post_init__(self):
                 # Scene settings
