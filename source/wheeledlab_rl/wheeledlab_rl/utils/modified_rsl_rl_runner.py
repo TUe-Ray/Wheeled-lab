@@ -2,7 +2,7 @@ import warnings
 import rsl_rl
 from rsl_rl import runners
 import os
-
+import numpy as np
 try:
     from tqdm import TqdmExperimentalWarning
 
