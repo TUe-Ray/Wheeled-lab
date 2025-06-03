@@ -105,7 +105,7 @@ class ObsCfg:
         to_goal_vector_term = ObsTerm(
             func=to_goal_vector,
             clip=(-torch.pi, torch.pi),
-            noise=Gnoise(std = 0.3),
+            noise=Gnoise(std = 0.6),
         )
 
         last_action_term = ObsTerm( 
