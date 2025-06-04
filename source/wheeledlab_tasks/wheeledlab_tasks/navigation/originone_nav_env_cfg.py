@@ -438,7 +438,7 @@ class TraverseABCfg:
     
     obstacle_velocity_penalty = RewTerm(
         func=combined_lidar_velocity_penalty,
-        weight=400,
+        weight=1000,
         params={"min_dist": 1, "exponent": 2.0, "distance_weight": 0.4},
     )
 
@@ -454,22 +454,12 @@ class TraverseABCfg:
 @configclass
 class NavigationCurriculumCfg:
 
-
-    decrease_dist_bonus = CurrTerm(
-        func=increase_reward_weight_over_time,
-        params={
-            "reward_term_name": "dist_bonus",
-            "increase": -4,
-            "episodes_per_increase": 15,
-            "max_increases": 3,
-        },
-    )
     decrease_forward_bonus = CurrTerm(
         func=increase_reward_weight_over_time,
         params={
             "reward_term_name": "forward_bonus",
             "increase": -3,
-            "episodes_per_increase": 5,
+            "episodes_per_increase":10,
             "max_increases": 3,
         },
     )
